@@ -53,7 +53,7 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
     const c = el('div', `upgrade${hired ? ' owned' : ''}${locked ? ' locked' : ''}`);
     const text = el('div', 'upgrade-text');
     text.append(el('b', '', `${d.name}  ${hired}/${d.max}`), el('span', '', d.desc));
-    const note = active < hired ? (d.needs ? 'Sin sitio para trabajar: deja una casilla libre detrás o al lado de la cabina o la barra. Mientras tanto no cobra ni ayuda.' : 'Sin dónde trabajar.') : `Sueldo: ${d.wage} monedas por minuto con el club abierto.`;
+    const note = active < hired ? (d.needs === 'lounge' ? 'Sin sitio para trabajar: hace falta un sofá, reservado, cama lounge o mesa VIP con una casilla libre al lado. Mientras tanto no cobra ni ayuda.' : d.needs ? 'Sin sitio para trabajar: deja una casilla libre detrás o al lado de la cabina o la barra. Mientras tanto no cobra ni ayuda.' : 'Sin dónde trabajar.') : `Sueldo: ${d.wage} monedas por minuto con el club abierto.`;
     text.append(el('span', 'wage', locked ? `Se desbloquea en el nivel ${d.unlockLevel}.` : note));
     c.append(text);
     const hire = button('', 'upgrade-buy', () => club.hireStaff(d.role));

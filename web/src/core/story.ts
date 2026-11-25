@@ -394,7 +394,7 @@ export function progressOf(m: Mission, state: ClubState): Progress {
     case 'dances': return { current: Math.min(state.stats.dances, g.count), target: g.count };
     case 'level': return { current: Math.min(levelNow(state), g.level), target: g.level };
     case 'luxury': return { current: Math.min(st.luxury, g.value), target: g.value };
-    case 'staff': return { current: Math.min(state.staff.guard + state.staff.dj + state.staff.bartender, g.count), target: g.count };
+    case 'staff': return { current: Math.min(state.staff.guard + state.staff.dj + state.staff.bartender + (state.staff.waiter ?? 0), g.count), target: g.count };
     case 'facade': return { current: Math.min(state.exterior.owned.length - 1, g.count), target: g.count };
     case 'songs': return { current: Math.min(state.music.tracks.length, g.count), target: g.count };
     case 'vips': return { current: Math.min(state.stats.vips, g.count), target: g.count };

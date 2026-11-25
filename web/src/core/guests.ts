@@ -169,7 +169,7 @@ export class GuestSim {
   private luxury = 0;
   private capacity = 0;
   private perks: DoorPerks = { arrivals: 1, patience: 1 };
-  private crew: StaffPerks = { drinkPrice: 1, danceTip: 0, patience: 1, door: 1, checksVips: false };
+  private crew: StaffPerks = { drinkPrice: 1, danceTip: 0, waiters: 0, patience: 1, door: 1, checksVips: false };
   private wages = 0;
   /** rent, power and cleaning per minute of an open club; charged only when the game turns the real rules on */
   private upkeep = 0;
@@ -689,6 +689,8 @@ export class GuestSim {
     } else if (g.mode === 'dance' || g.mode === 'lounge') {
       g.happiness = Math.min(100, g.happiness + 6);
       if (g.mode === 'dance') this.events.push({ x: g.x, y: g.y, amount: this.crew.danceTip, kind: 'dance' });
+      // a waiter brings a drink to whoever sits down (more waiters, quicker service: a bigger order)
+      if (g.mode === 'lounge' && this.crew.waiters > 0 && !g.vip) this.pay(g, Math.round(DRINK_PRICE * 0.6 * (1 + 0.4 * (this.crew.waiters - 1)) * this.crew.drinkPrice), 'drink');
     }
     this.release(g);
     this.decide(g);

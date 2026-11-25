@@ -7,7 +7,7 @@ import { blockedSet, cellsOf, phaseOf, type ClubState } from './club.ts';
 import { PRICE_SCALE } from './pricing.ts';
 import { levelOf } from './progression.ts';
 
-export type Role = 'guard' | 'dj' | 'bartender';
+export type Role = 'guard' | 'dj' | 'bartender' | 'waiter';
 
 export interface StaffDef {
   role: Role;
@@ -21,12 +21,13 @@ export interface StaffDef {
   unlockLevel: number;
   max: number;
   /** what they need in the club to be useful */
-  needs?: 'dj_booth' | 'bar';
+  needs?: 'dj_booth' | 'bar' | 'lounge';
 }
 
 const BASE_STAFF: StaffDef[] = [
-  { role: 'bartender', name: 'Bartender', plural: 'Bartenders', desc: 'Sirve mejor y cobra más caro: cada uno sube el precio de los tragos un 25%. Necesita una barra.', hire: 600, wage: 2, unlockLevel: 3, max: 2, needs: 'bar' },
-  { role: 'dj', name: 'DJ', plural: 'DJs', desc: 'Mantiene la pista viva: cada baile termina con propina. Necesita la cabina.', hire: 1200, wage: 3, unlockLevel: 4, max: 1, needs: 'dj_booth' },
+  { role: 'bartender', name: 'Bartender', plural: 'Bartenders', desc: 'Atiende una barra: los dos primeros suben el precio de los tragos un 25% cada uno, los siguientes un 10%. Cada barra (recta, de cócteles, larga o de esquina) tiene sitio para los que quepan detrás, según su largo.', hire: 600, wage: 2, unlockLevel: 3, max: 6, needs: 'bar' },
+  { role: 'dj', name: 'DJ', plural: 'DJs', desc: 'Mantiene la pista viva: cada baile termina con propina. Necesita la cabina. Un segundo DJ (con una segunda cabina) duplica las propinas.', hire: 1200, wage: 3, unlockLevel: 4, max: 2, needs: 'dj_booth' },
+  { role: 'waiter', name: 'Mesero', plural: 'Meseros', desc: 'Atiende sofás, reservados, camas lounge y mesas VIP: cuando alguien se sienta, le lleva un trago a la mesa. Uno por mueble de esos.', hire: 900, wage: 3, unlockLevel: 14, max: 4, needs: 'lounge' },
   { role: 'guard', name: 'Guardia', plural: 'Guardias', desc: 'El primero reconoce a los famosos de verdad y hace que la fila aguante más. Con dos, la puerta deja pasar más rápido.', hire: 800, wage: 2, unlockLevel: 5, max: 2 },
 ];
 
@@ -40,7 +41,7 @@ export const WAGE_EVERY = 30;
 export type StaffCount = Record<Role, number>;
 
 export function newStaff(): StaffCount {
-  return { guard: 0, dj: 0, bartender: 0 };
+  return { guard: 0, dj: 0, bartender: 0, waiter: 0 };
 }
 
 export function sanitizeStaff(raw: unknown): StaffCount {
@@ -65,11 +66,14 @@ const FRONT: Array<[number, number]> = [[0, 1], [-1, 0], [0, -1], [1, 0]];
  * another piece of furniture, on a free cell at one end of it. Never inside the furniture. No free cell, no spot, and
  * the worker has nowhere to work.
  */
-export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[] } {
+/** the furniture a waiter looks after */
+export const LOUNGE_IDS = ['sofa_vip', 'sofa_corner', 'booth', 'lounge_bed', 'table_vip'];
+
+export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[]; waiter: Spot[] } {
   const p = phaseOf(state);
   const blocked = blockedSet(state.items);
   const free = (x: number, y: number) => x >= 0 && y >= 0 && x < p.w && y < p.h && !blocked.has(`${x},${y}`);
-  const out: { dj: Spot[]; bartender: Spot[] } = { dj: [], bartender: [] };
+  const out: { dj: Spot[]; bartender: Spot[]; waiter: Spot[] } = { dj: [], bartender: [], waiter: [] };
   const taken = new Set<string>();
   for (const it of state.items) {
     const def = BY_ID.get(it.id);
@@ -102,6 +106,25 @@ export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[] } 
       out[role].push({ x: x + 0.5, z: y + 0.5, fx, fz });
     }
   }
+  // waiters: a free cell right next to each lounge piece, facing it
+  for (const it of state.items) {
+    const def = BY_ID.get(it.id);
+    if (!def || !LOUNGE_IDS.includes(it.id)) continue;
+    const cells = cellsOf(def, it.x, it.y, it.rot);
+    const own = new Set(cells.map(([x, y]) => `${x},${y}`));
+    const mx = cells.reduce((a, [x]) => a + x, 0) / cells.length + 0.5;
+    const my = cells.reduce((a, [, y]) => a + y, 0) / cells.length + 0.5;
+    const ring: Array<[number, number]> = [];
+    for (const [x, y] of cells) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!own.has(`${x + dx},${y + dy}`)) ring.push([x + dx, y + dy]);
+    for (const [x, y] of ring) {
+      const k = `${x},${y}`;
+      if (!free(x, y) || taken.has(k)) continue;
+      taken.add(k);
+      const len = Math.hypot(mx - (x + 0.5), my - (y + 0.5)) || 1;
+      out.waiter.push({ x: x + 0.5, z: y + 0.5, fx: (mx - (x + 0.5)) / len, fz: (my - (y + 0.5)) / len });
+      break;
+    }
+  }
   return out;
 }
 
@@ -110,7 +133,8 @@ export function working(state: ClubState): StaffCount {
   const spots = staffSpots(state);
   const out = newStaff();
   out.guard = state.staff.guard;
-  out.dj = Math.min(state.staff.dj, Math.min(spots.dj.length, 1));
+  out.dj = Math.min(state.staff.dj, Math.min(spots.dj.length, 2));
+  out.waiter = Math.min(state.staff.waiter ?? 0, spots.waiter.length);
   out.bartender = Math.min(state.staff.bartender, spots.bartender.length);
   return out;
 }
@@ -125,6 +149,8 @@ export interface StaffPerks {
   drinkPrice: number;
   danceTip: number;
   patience: number;
+  /** waiters working: each seated guest gets a drink brought to the table */
+  waiters: number;
   /** door speed: multiplier on how fast the line moves */
   door: number;
   checksVips: boolean;
@@ -133,8 +159,9 @@ export interface StaffPerks {
 export function perksOfStaff(state: ClubState): StaffPerks {
   const w = working(state);
   return {
-    drinkPrice: 1 + 0.25 * w.bartender,
-    danceTip: w.dj ? DANCE_TIP : 0,
+    drinkPrice: 1 + 0.25 * Math.min(w.bartender, 2) + 0.1 * Math.max(0, w.bartender - 2),
+    danceTip: DANCE_TIP * w.dj,
+    waiters: w.waiter,
     patience: w.guard ? 1.2 : 1,
     door: w.guard >= 2 ? 1.5 : 1,
     checksVips: w.guard >= 1,

@@ -83,7 +83,7 @@ test('hiring needs level, coins and room; wages only run while someone has a pla
   assert.equal(perksOfStaff(s).drinkPrice, 1);
   s = placeItem(s, 'dj_booth', 1, 1, 0, 'free').state;
   s = placeItem(s, 'bar_straight', 4, 1, 0, 'free').state;
-  assert.deepEqual(working(s), { guard: 0, dj: 1, bartender: 1 });
+  assert.deepEqual(working(s), { guard: 0, dj: 1, bartender: 1, waiter: 0 });
   assert.equal(wagePerMinute(s), 3 + 2);
   assert.equal(perksOfStaff(s).drinkPrice, 1.25);
   assert.match(hireStaff(hireStaff(s, 'dj').state, 'dj').error, /máximo/);
@@ -111,6 +111,25 @@ test('staff changes the night: wages are charged while open, drinks sell dearer,
   assert.equal(crew.wage, -Math.round((7 * 30) / 60) * 20, 'a 10 minute night costs 7 coins a minute');
   assert.ok(crew.drink > none.drink * 1.1, 'the bartender sells dearer');
   assert.ok(crew.dance > 0 && (none.dance ?? 0) === 0, 'the DJ earns tips');
+});
+
+test('every bar can have its own bartender, a second booth a second DJ, and a waiter looks after the lounge furniture', () => {
+  let s = { ...rich(2), phase: 4 };
+  s = placeItem(s, 'bar_straight', 1, 1, 0, 'free').state;
+  s = placeItem(s, 'cocktail_bar', 6, 1, 0, 'free').state;
+  s = placeItem(s, 'dj_booth', 12, 1, 0, 'free').state;
+  s = placeItem(s, 'dj_booth_pro', 3, 9, 0, 'free').state;
+  const hired = (n) => ({ ...s, staff: { guard: 0, dj: 2, bartender: n, waiter: 2 } });
+  assert.equal(working(hired(6)).bartender, Math.min(6, staffSpots(s).bartender.length), 'a bartender for each place behind a bar, no more');
+  assert.ok(working(hired(6)).bartender >= 2);
+  assert.equal(working(hired(2)).dj, 2, 'two booths, two DJs');
+  assert.equal(working(hired(2)).waiter, 0, 'no sofa or table, nothing to wait on');
+  const withSofa = placeItem(hired(2), 'sofa_vip', 8, 6, 0, 'free').state;
+  assert.equal(working(withSofa).waiter, 1, 'one waiter per lounge piece');
+  assert.equal(perksOfStaff(withSofa).waiters, 1);
+  assert.ok(perksOfStaff(hired(4)).drinkPrice > perksOfStaff(hired(2)).drinkPrice && perksOfStaff(hired(4)).drinkPrice < 1 + 0.25 * 4, 'extra bartenders add a smaller bonus');
+  assert.equal(sanitizeClub({ staff: { bartender: 99, waiter: 99 } }).staff.bartender, 6);
+  assert.equal(sanitizeClub({ staff: { waiter: 99 } }).staff.waiter, 4);
 });
 
 test('workers stand on free cells, never in the furniture or the wall; no free cell, no work', () => {

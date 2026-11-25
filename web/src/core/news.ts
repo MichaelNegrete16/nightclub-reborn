@@ -24,6 +24,18 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25r',
+    date: '25 de noviembre de 2026',
+    title: 'Más empleados y botones que responden',
+    intro: 'Todas las barras tienen quien las atienda, hay un puesto nuevo y los clics ya no se pierden.',
+    entries: [
+      { kind: 'icon', ref: 'check', title: 'Los botones ya responden a la primera', text: 'La barra de acciones (Mejorar, Mover, Guardar, Vender) se reconstruía varias veces por segundo y se llevaba el clic. Ahora solo cambia cuando hace falta y nunca mientras la estás pulsando.', where: 'Al seleccionar un objeto' },
+      { kind: 'icon', ref: 'guests', title: 'Hasta 6 bartenders', text: 'Cada barra (recta, de cócteles, larga o de esquina) tiene sitio para su bartender. Los dos primeros suben el precio de los tragos un 25% cada uno; los siguientes, un 10%.', where: 'Oficina › Tu equipo' },
+      { kind: 'icon', ref: 'music', title: 'Segundo DJ', text: 'Con una segunda cabina (la normal y la profesional) puedes tener dos DJs: las propinas del baile se duplican.', where: 'Oficina › Tu equipo' },
+      { kind: 'icon', ref: 'star', title: 'Puesto nuevo: Mesero', text: 'Atiende sofás, reservados, camas lounge y mesas VIP: cuando alguien se sienta, le lleva un trago a la mesa. Hasta 4 meseros, uno por mueble de esos (nivel 14).', where: 'Oficina › Tu equipo' },
+    ],
+  },
+  {
     id: '2026-11-25q',
     date: '25 de noviembre de 2026',
     title: 'Robos sin límite de nivel',

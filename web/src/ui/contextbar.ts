@@ -10,9 +10,45 @@ import { icon } from './icons';
 export class ContextBar {
   readonly root = el('div', 'contextbar');
 
-  constructor(private club: ClubView) {}
+  /** what the bar showed last time: the buttons are only rebuilt when this changes */
+  private last = '';
+  private pressing = false;
+  private dirty = false;
+
+  constructor(private club: ClubView) {
+    // The game refreshes about twice a second (money comes in). Rebuilding the buttons each time swaps the button under the
+    // finger, and a click that starts on the old one and ends on the new one is lost (it took three tries to upgrade).
+    this.root.addEventListener('pointerdown', () => (this.pressing = true), true);
+    const release = () => {
+      this.pressing = false;
+      if (this.dirty) window.setTimeout(() => this.dirty && !this.pressing && this.update(), 80); // after the click was delivered
+    };
+    window.addEventListener('pointerup', release, true);
+    window.addEventListener('pointercancel', release, true);
+  }
+
+  /** Everything the bar's content depends on. */
+  private signature(): string {
+    const v = this.club;
+    const t = v.tool;
+    const sel = v.state.items.find((i) => i.uid === v.selectedUid);
+    return JSON.stringify([
+      t.kind,
+      t.kind === 'place' ? [t.defId, t.mode, !!t.moveFrom] : 0,
+      v.message,
+      sel ? [sel.uid, sel.id, tierOfItem(sel), (sel.hot ?? 0) > Date.now()] : 0,
+    ]);
+  }
 
   update(): void {
+    const sig = this.signature();
+    if (sig === this.last) return;
+    if (this.pressing) {
+      this.dirty = true;
+      return;
+    }
+    this.last = sig;
+    this.dirty = false;
     const v = this.club;
     this.root.replaceChildren();
     this.root.classList.remove('show', 'placing');

@@ -1732,10 +1732,8 @@ export class ClubView {
     };
     // the DJ and the bartenders stand on free cells next to their booth or bar, never inside the furniture
     const spots = staffSpots(s);
-    if (s.staff.dj && spots.dj[0]) {
-      const sp = spots.dj[0];
-      add('dj:0', true, sp.x, sp.z, [sp.fx, sp.fz], 'dj_mix');
-    }
+    spots.dj.slice(0, s.staff.dj).forEach((sp, i) => add(`dj:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'dj_mix'));
+    spots.waiter.slice(0, s.staff.waiter).forEach((sp, i) => add(`waiter:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
     spots.bartender.slice(0, s.staff.bartender).forEach((sp, i) => add(`bartender:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
     const [d1] = doorCells(p);
     for (let i = 0; i < s.staff.guard; i++) {

@@ -27,7 +27,7 @@ export interface Tip {
   locked: string;
 }
 
-const staffCount = (s: ClubState) => s.staff.guard + s.staff.dj + s.staff.bartender;
+const staffCount = (s: ClubState) => s.staff.guard + s.staff.dj + s.staff.bartender + (s.staff.waiter ?? 0);
 
 export const TIPS: Tip[] = [
   { id: 'shop', icon: 'shop', title: 'La Tienda', text: 'Lo que compras va a tu Inventario. Elígelo y haz clic en el piso para colocarlo. Si no te cabe, amplía el local.', when: (c) => c.opened.has('shop'), locked: 'Se explica la primera vez que abras la Tienda.' },
