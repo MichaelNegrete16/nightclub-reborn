@@ -14,6 +14,7 @@ import { Coach } from './coach';
 import { ContextBar } from './contextbar';
 import { Hud } from './hud';
 import { openFacade } from './facade';
+import { caricature } from './caricature';
 import { openOffice } from './office';
 import { openMenu } from './menu';
 import { mountMinimap } from './minimap';
@@ -149,6 +150,7 @@ export class GameUi {
       onPhaseUp: () => void this.playPending(),
       onToast: (m, k) => this.toast(m, k ?? 'bad'),
       onVip: (v) => this.showVip(v),
+      onStar: (c, n) => this.showStar(c, n),
       onJail: (m) => void this.playArrest(m),
       onMode: () => this.refresh(),
     };
@@ -385,6 +387,16 @@ export class GameUi {
     const club = this.deps.club;
     const card = el('div', 'vip-card');
     card.append(el('small', '', '★ Alguien famoso en la puerta'));
+    const url = caricature(v.vip.celeb);
+    if (url) {
+      const ph = el('div', 'vip-photo');
+      const img = el('img') as HTMLImageElement;
+      img.src = url;
+      img.alt = v.vip.name;
+      ph.append(img);
+      if (v.vip.checked) ph.append(el('span', v.vip.real ? 'vip-stamp real' : 'vip-stamp fake', v.vip.real ? 'REAL' : 'FALSO'));
+      card.append(ph);
+    }
     card.append(el('b', '', v.vip.name));
     card.append(el('span', 'vip-claim', `Dice que es ${v.vip.title}.`));
     if (!v.vip.checked) {
@@ -401,6 +413,21 @@ export class GameUi {
     card.append(row);
     this.vipCard = card;
     this.stage.append(card);
+  }
+
+  /** A real star walks in: their caricature pops up for a few seconds. */
+  private showStar(celeb: string, name: string): void {
+    const url = caricature(celeb);
+    if (!url) return;
+    this.stage.querySelector('.star-splash')?.remove();
+    const box = el('div', 'star-splash');
+    const img = el('img') as HTMLImageElement;
+    img.src = url;
+    img.alt = name;
+    box.append(el('small', '', '★ ¡Llegó una estrella! ★'), img, el('b', '', name));
+    box.addEventListener('click', () => box.remove());
+    this.stage.append(box);
+    setTimeout(() => box.remove(), 4500);
   }
 
   // ---- refresh -------------------------------------------------------------------------------

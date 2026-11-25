@@ -528,3 +528,25 @@ body.in-prison .bottombar, body.in-prison .view-controls, body.in-prison .contex
 
 .rank-jail h4 { font-size: 13px; color: #ff9aa6; margin-bottom: 4px; }
 .rank-jail p { margin: 2px 0; font-size: 13px; }
+
+/* ---- famous guests: caricature portraits ---------------------------------------------------- */
+.vip-card .vip-photo { position: relative; width: 112px; height: 126px; margin: 2px 0 4px; }
+.vip-card .vip-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; border: 3px solid var(--gold, #f5b91d); box-shadow: 0 4px 0 #0006; }
+.vip-card .vip-stamp { position: absolute; right: -14px; bottom: 10px; transform: rotate(-14deg); font-family: Bungee, sans-serif; font-size: 15px; padding: 2px 8px; border: 3px solid currentColor; border-radius: 8px; background: #150d26cc; }
+.vip-card .vip-stamp.real { color: #3ddc97; }
+.vip-card .vip-stamp.fake { color: #ff4f6a; }
+.star-splash { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 18px 16px; border-radius: 22px; background: radial-gradient(circle at 50% 30%, #3a2470, #150d26); border: 3px solid #f5b91d; box-shadow: 0 0 0 6px #f5b91d33, 0 0 60px #f5b91d66; animation: starPop 4.5s ease-out forwards; cursor: pointer; }
+.star-splash small { font-family: Bungee, sans-serif; color: #f5b91d; font-size: 14px; letter-spacing: .5px; }
+.star-splash img { width: 200px; height: 225px; border-radius: 18px; border: 4px solid #fff; object-fit: cover; }
+.star-splash b { font-family: Bungee, sans-serif; font-size: 20px; color: #fff; text-shadow: 0 2px 0 #d6314a; }
+@keyframes starPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(-8deg); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(2deg); }
+  16% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  85% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -54%) scale(.92); }
+}
+@media (max-width: 600px), (max-height: 500px) {
+  .vip-card .vip-photo { width: 80px; height: 90px; }
+  .star-splash img { width: 140px; height: 158px; }
+}

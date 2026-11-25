@@ -143,6 +143,7 @@ async function main() {
     onPhaseUp: (p) => uiHooks?.onPhaseUp(p),
     onToast: (m, k) => uiHooks?.onToast(m, k),
     onVip: (v) => uiHooks?.onVip(v),
+    onStar: (c, n) => uiHooks?.onStar?.(c, n),
     onJail: (m) => uiHooks?.onJail(m),
     onMode: (m) => uiHooks?.onMode(m),
   });
@@ -237,7 +238,10 @@ async function main() {
     club.launder = (uid) => net.launder(uid);
     net.onLaunder = (r) => {
       uiHooks?.onToast(r.ok ? `Pieza limpia: pagaste ${(r.price ?? 0).toLocaleString('es-CO')} a Zeta.` : r.error ?? 'No se pudo limpiar.', r.ok ? 'ok' : 'bad');
-      if (r.ok) void cloud.sync(true);
+      if (r.ok) {
+        club.applyLaunder(r.uid, r.price ?? 0);
+        void cloud.sync(true);
+      }
     };
     net.onGuard = (r) => {
       uiHooks?.onToast(r.ok ? 'Protector antirrobos activo.' : r.error ?? 'No se pudo comprar el protector.', r.ok ? 'ok' : 'bad');

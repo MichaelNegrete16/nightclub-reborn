@@ -403,15 +403,21 @@ export function upgradeItem(state: ClubState, uid: string): Result {
   return { state: { ...state, coins: state.coins - cost, items: state.items.map((i) => (i.uid === uid ? { ...i, tier: tier + 1 } : i)) } };
 }
 
-/** Take an object out of the room into the inventory (no money changes hands). */
-export function stashItem(state: ClubState, uid: string): Result {
+/**
+ * Take an object out of the room. A normal piece goes to the inventory (no money changes hands); a stolen one that is
+ * still hot goes back to the bag, keeping its version and its heat (the inventory would otherwise clean it for free).
+ */
+export function stashItem(state: ClubState, uid: string, now = Date.now()): Result {
   const it = state.items.find((i) => i.uid === uid);
   if (!it) return { state, error: 'No existe' };
+  const items = state.items.filter((i) => i.uid !== uid);
+  if ((it.hot ?? 0) > now) {
+    if (state.loot.length >= 20) return { state, error: 'Tu bolsa está llena (20 piezas).' };
+    return { state: { ...state, items, loot: [...state.loot, { uid: it.uid, id: it.id, tier: tierOfItem(it), hotUntil: it.hot!, from: -1 }] } };
+  }
   // the inventory only keeps basic pieces: an improved one would lose what was paid for it
   if (tierOfItem(it) > 1) return { state, error: 'Una pieza mejorada no se guarda: puedes moverla o venderla.' };
-  return {
-    state: { ...state, items: state.items.filter((i) => i.uid !== uid), inventory: withInventory(state, it.id, 1) },
-  };
+  return { state: { ...state, items, inventory: withInventory(state, it.id, 1) } };
 }
 
 /** Sell an object from the room. `refund` false is used internally while picking something up to move it. */

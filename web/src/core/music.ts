@@ -61,6 +61,18 @@ export const LIBRARY: Track[] = [
   { id: 's_gozadera', title: 'La gozadera · Gente de Zona, Marc Anthony', genre: 'salsa', bpm: 98, source: 'song', ref: 'la-gozadera' },
   { id: 's_playa', title: 'Vamos pa la playa', genre: 'salsa', bpm: 100, source: 'song', ref: 'vamos-pa-la-playa' },
   { id: 's_bby', title: 'BbY WOW (mix) · Karol G, Judeline, Rusowsky', genre: 'pop', bpm: 96, source: 'song', ref: 'bby-wow' },
+  { id: 's_fever', title: 'Fever · Vybz Kartel', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'fever' },
+  { id: 's_conjugal', title: 'Conjugal Visit · Spice, Vybz Kartel', genre: 'reggaeton', bpm: 96, source: 'song', ref: 'conjugal-visit' },
+  { id: 's_sidechick', title: 'Side Chick', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'side-chick' },
+  { id: 's_prendete', title: 'Préndete · Jose Mc, Nigga Lionz, Seven Plom', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'prendete' },
+  { id: 's_nomehables', title: 'No me hables · Mosta Man, Lil Silvio, Kevin Florez', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'no-me-hables' },
+  { id: 's_cantinero', title: 'Cantinero · Lil Silvio', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'cantinero' },
+  { id: 's_juegate', title: 'Juégate a la suerte · Maelo Ruiz', genre: 'salsa', bpm: 98, source: 'song', ref: 'juegate-a-la-suerte' },
+  { id: 's_nonstop', title: 'Non Stop · Gyptian', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'non-stop' },
+  { id: 's_costenita', title: 'Costeñita · Reyes On The Mic, Mosta Man', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'costenita' },
+  { id: 's_bikeback', title: 'Bike Back · Charly Black', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'bike-back' },
+  { id: 's_arabe', title: 'Árabe · Kevin Florez, Big Mancilla, Reyes On The Mic', genre: 'reggaeton', bpm: 100, source: 'song', ref: 'arabe' },
+  { id: 's_fleek', title: 'Fleek · Alkaline', genre: 'reggaeton', bpm: 96, source: 'song', ref: 'fleek' },
 ];
 export const LIBRARY_BY_ID = new Map(LIBRARY.map((t) => [t.id, t]));
 

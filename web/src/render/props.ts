@@ -113,6 +113,157 @@ type Builder = (g: THREE.Group, tier: number) => void;
 
 const pick = <T,>(tier: number, a: T, b: T, c: T, d: T): T => [a, b, c, d][tier - 1];
 
+/**
+ * Props that move carry `userData.tick(time, beat, pulse, dt)`; the club view calls it every frame. `beat` counts beats of
+ * the song playing (or a steady clock when nothing plays) and `pulse` is 1 on each kick, fading to 0.
+ */
+export type PropTick = (time: number, beat: number, pulse: number, dt: number) => void;
+
+/** A speaker cone that pumps out with every kick. */
+function pump(m: THREE.Mesh, amount = 1): THREE.Mesh {
+  const z0 = m.position.z;
+  const s0 = m.scale.clone();
+  m.userData.tick = ((_t, _b, p) => {
+    m.position.z = z0 + 0.035 * p * amount;
+    m.scale.set(s0.x * (1 + 0.14 * p * amount), s0.y, s0.z * (1 + 0.14 * p * amount));
+  }) as PropTick;
+  return m;
+}
+
+interface DancerLook { top: number; bottom: number; skin: number; hair: number; shoes: number; lit?: O }
+
+/**
+ * A pole dancer with joints (hips, knees, waist, shoulders, elbows) who runs a routine on the beat: spinning round the
+ * pole, dancing facing the crowd with her arms up, sliding down the pole and a body roll. `r` is how far she stands from
+ * the pole. Returns the group to add at the foot of the pole.
+ */
+function poleDancer(look: DancerLook, r: number, scale: number): THREE.Group {
+  const mat = (c: number, o?: O) => toon(c, o);
+  const capsule = (rad: number, len: number, c: number, y: number, o?: O) => {
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len, 4, 10), mat(c, o));
+    m.position.y = y;
+    return m;
+  };
+  const orbit = new THREE.Group(); // turns round the pole
+  const root = new THREE.Group(); // the body, at distance r from the pole
+  root.scale.setScalar(scale);
+  orbit.add(root);
+
+  const leg = (side: number) => {
+    const hip = new THREE.Group();
+    hip.position.set(side * 0.07, 0.5, 0);
+    hip.add(capsule(0.055, 0.2, look.skin, -0.13));
+    const knee = new THREE.Group();
+    knee.position.y = -0.26;
+    knee.add(capsule(0.042, 0.18, look.skin, -0.11));
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.13), mat(look.shoes));
+    shoe.position.set(0, -0.23, 0.03);
+    knee.add(shoe);
+    hip.add(knee);
+    root.add(hip);
+    return { hip, knee };
+  };
+  const L = leg(1);
+  const R = leg(-1);
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), mat(look.bottom, look.lit));
+  pelvis.scale.set(1.1, 0.75, 0.85);
+  pelvis.position.y = 0.53;
+  root.add(pelvis);
+
+  const upper = new THREE.Group(); // pivots at the waist
+  upper.position.y = 0.6;
+  root.add(upper);
+  upper.add(capsule(0.07, 0.1, look.skin, 0.06));
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), mat(look.top, look.lit));
+  chest.scale.set(1.05, 1.1, 0.85);
+  chest.position.y = 0.24;
+  upper.add(chest, capsule(0.03, 0.05, look.skin, 0.37));
+  const head = new THREE.Group();
+  head.position.y = 0.5;
+  const face = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 2), mat(look.skin));
+  const mane = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), mat(look.hair));
+  mane.scale.set(1.05, 1.2, 0.95);
+  mane.position.set(0, 0.01, -0.035);
+  const tail = capsule(0.05, 0.2, look.hair, -0.17);
+  tail.position.z = -0.09;
+  head.add(face, mane, tail);
+  upper.add(head);
+
+  const arm = (side: number) => {
+    const sh = new THREE.Group();
+    sh.position.set(side * 0.14, 0.33, 0);
+    sh.add(capsule(0.032, 0.16, look.skin, -0.1));
+    const el = new THREE.Group();
+    el.position.y = -0.22;
+    el.add(capsule(0.028, 0.15, look.skin, -0.09));
+    sh.add(el);
+    upper.add(sh);
+    return { sh, el };
+  };
+  const AL = arm(1);
+  const AR = arm(-1);
+
+  // a pose is a set of joint angles; the routine blends from one move to the next
+  type Pose = {
+    face: number; speed: number; y: number; sway: number; lean: number; twist: number; tilt: number; nod: number;
+    lHip: number; lKnee: number; rHip: number; rKnee: number;
+    lArmX: number; lArmZ: number; lEl: number; rArmX: number; rArmZ: number; rEl: number;
+  };
+  const S = Math.sin;
+  const moves: Array<(b: number) => Pose> = [
+    // spin: one hand high on the pole, one leg hooked out, turning fast
+    (b) => ({ face: -Math.PI / 2 + 0.5, speed: 2.4, y: 0.04 + 0.03 * S(b * Math.PI), sway: 0, lean: -0.25, twist: 0.2, tilt: 0.1, nod: -0.2,
+      lHip: -0.15, lKnee: 0.2, rHip: -1.0, rKnee: 0.9, lArmX: -0.6, lArmZ: 1.3, lEl: -0.3, rArmX: -2.7, rArmZ: 0.2, rEl: -0.2 }),
+    // facing the crowd: hips side to side, arms up waving
+    (b) => ({ face: Math.PI / 2, speed: 0, y: -0.03 * Math.abs(S(b * Math.PI)), sway: 0.06 * S(b * Math.PI), lean: 0.05, twist: 0.15 * S(b * Math.PI), tilt: -0.12 * S(b * Math.PI), nod: 0.1 * S(b * Math.PI * 2),
+      lHip: -0.1, lKnee: 0.25 + 0.25 * Math.abs(S(b * Math.PI)), rHip: -0.1, rKnee: 0.25 + 0.25 * Math.abs(S(b * Math.PI + 1.5)),
+      lArmX: -2.6 + 0.3 * S(b * Math.PI), lArmZ: 0.35, lEl: -0.6, rArmX: -2.6 - 0.3 * S(b * Math.PI), rArmZ: -0.35, rEl: -0.6 }),
+    // back to the pole, sliding down and up again
+    (b) => {
+      const d = 0.5 - 0.5 * Math.cos(b * Math.PI * 0.5);
+      return { face: Math.PI / 2, speed: 0.3, y: -0.2 * d, sway: 0, lean: -0.15 - 0.15 * d, twist: 0, tilt: 0.1 * S(b * Math.PI), nod: -0.3 * d,
+        lHip: -1.2 * d, lKnee: 1.9 * d, rHip: -1.2 * d - 0.1, rKnee: 1.9 * d, lArmX: -2.9, lArmZ: -0.2, lEl: -0.4, rArmX: -2.9, rArmZ: 0.2, rEl: -0.4 };
+    },
+    // body roll, side on to the pole, arms in front
+    (b) => ({ face: -0.2, speed: 0.7, y: -0.02, sway: 0.04 * S(b * Math.PI + 1), lean: 0.3 * S(b * Math.PI), twist: 0.2 * S(b * Math.PI * 0.5), tilt: 0.15 * S(b * Math.PI + 1), nod: -0.25 * S(b * Math.PI),
+      lHip: -0.2 * S(b * Math.PI), lKnee: 0.3 + 0.2 * S(b * Math.PI), rHip: 0.1, rKnee: 0.2,
+      lArmX: -1.4, lArmZ: 0.4, lEl: -1.4 + 0.4 * S(b * Math.PI), rArmX: -1.3, rArmZ: -0.4, rEl: -1.4 - 0.4 * S(b * Math.PI) }),
+  ];
+  const BARS = 8; // beats per move
+  let angle = Math.random() * Math.PI * 2;
+  orbit.userData.tick = ((_t, beat, _p, dt) => {
+    const k = Math.floor(beat / BARS);
+    const f = (beat % BARS) / BARS;
+    const a = moves[((k % moves.length) + moves.length) % moves.length](beat);
+    let w = 0;
+    let p = a;
+    if (f > 0.85) {
+      // blend into the next move over the last beat or so
+      const x = (f - 0.85) / 0.15;
+      w = x * x * (3 - 2 * x);
+      const n = moves[(((k + 1) % moves.length) + moves.length) % moves.length](beat);
+      p = {} as Pose;
+      for (const key of Object.keys(a) as Array<keyof Pose>) p[key] = a[key] + (n[key] - a[key]) * w;
+    }
+    angle += p.speed * Math.min(dt, 0.1);
+    orbit.rotation.y = angle;
+    root.position.set(r + p.sway * scale, p.y * scale, 0);
+    root.rotation.y = p.face;
+    upper.rotation.set(p.lean, p.twist, p.tilt);
+    head.rotation.x = p.nod;
+    L.hip.rotation.x = p.lHip;
+    L.knee.rotation.x = p.lKnee;
+    R.hip.rotation.x = p.rHip;
+    R.knee.rotation.x = p.rKnee;
+    AL.sh.rotation.set(p.lArmX, 0, p.lArmZ);
+    AL.el.rotation.x = p.lEl;
+    AR.sh.rotation.set(p.rArmX, 0, p.rArmZ);
+    AR.el.rotation.x = p.rEl;
+  }) as PropTick;
+  orbit.userData.tick(0, 0, 0, 0);
+  return orbit;
+}
+
 /** Colours of the seats by version: faded plastic, red vinyl, leather with chrome, royal velvet with gold. */
 function seatPal(tier: number): { main: number; dark: number; leg: number; accent: number; glow: number } {
   return {
@@ -151,59 +302,17 @@ const TIERED: Record<string, Builder> = {
     }
     // the pole
     g.add(cyl(0.04, 0.04, 1.95, 0xdfe6f2, 0, 0.16, 0, 10));
-    // the dancer: a cartoon figure with proportions (legs, hips, waist, chest, neck, head, hair, arms), holding the pole with one
-    // hand and turning round it (the club view spins whatever carries `userData.spin`)
-    const turn = new THREE.Group();
-    turn.userData.spin = 1.1;
-    const top = pick(t, 0xff4fa3, 0x18e0ff, 0xb04cff, 0xffc81a);
-    const bottom = pick(t, 0x2a2238, 0x15101f, 0x15101f, 0x15101f);
-    const skin = pick(t, 0xe8b890, 0xc98e66, 0xf0c8a0, 0x8a5a3c);
-    const hair = pick(t, 0x3a2418, 0x15101f, 0xe8d36a, 0xff4fa3);
-    const shoes = pick(t, 0x2a2238, 0xd6314a, 0xdfe6f2, 0xffc81a);
-    const lit = t === 4 ? glow(top, 0.45) : undefined;
-    const cap = (r: number, len: number, color: number, x: number, y: number, z: number, o?: O): THREE.Mesh => {
-      const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), toon(color, o));
-      m.position.set(x, y, z);
-      return m;
-    };
-    const dancer = new THREE.Group();
-    dancer.position.set(0.3, 0.16, 0);
-    dancer.rotation.y = -Math.PI / 2; // she faces the pole
-    dancer.scale.setScalar(1.3);
-    // legs: one straight, one bent forward on its heel, both with heels
-    const legL = new THREE.Group();
-    legL.add(cap(0.055, 0.26, skin, 0, 0.36, 0), cap(0.042, 0.26, skin, 0, 0.1, 0), box(0.07, 0.05, 0.13, shoes, 0, 0, 0.03, undefined, 0.012), cyl(0.012, 0.012, 0.09, shoes, 0, 0, -0.03, 5));
-    legL.position.set(-0.07, 0.06, 0);
-    const legR = new THREE.Group();
-    legR.add(cap(0.055, 0.24, skin, 0, 0.34, 0), cap(0.042, 0.24, skin, 0, 0.1, 0), box(0.07, 0.05, 0.13, shoes, 0, 0, 0.03, undefined, 0.012));
-    legR.position.set(0.07, 0.06, 0.02);
-    legR.rotation.x = -0.12;
-    dancer.add(legL, legR);
-    const hips = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), toon(bottom, lit));
-    hips.scale.set(1.1, 0.75, 0.85);
-    hips.position.set(0, 0.64, 0);
-    dancer.add(hips);
-    dancer.add(cap(0.07, 0.12, skin, 0, 0.76, 0));
-    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), toon(top, lit));
-    chest.scale.set(1.05, 1.1, 0.85);
-    chest.position.set(0, 0.92, 0);
-    dancer.add(chest);
-    dancer.add(cap(0.03, 0.06, skin, 0, 1.05, 0));
-    dancer.add(ball(0.1, skin, 0, 1.17, 0.01, { detail: 2 }));
-    // long hair down the back, with a fringe on top
-    const mane = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), toon(hair));
-    mane.scale.set(1.05, 1.25, 0.95);
-    mane.position.set(0, 1.17, -0.035);
-    dancer.add(mane);
-    dancer.add(cap(0.05, 0.2, hair, 0, 0.98, -0.1));
-    // arms: the right one up on the pole, the left on her hip
-    const armR = cap(0.032, 0.34, skin, 0.03, 1.18, 0.1); // reaches forward and up to the pole
-    armR.rotation.x = 0.6;
-    const armL = cap(0.032, 0.26, skin, 0.15, 0.86, 0.02);
-    armL.rotation.z = 0.7;
-    dancer.add(armR, armL);
-    turn.add(dancer);
-    g.add(turn);
+    // the dancer: jointed, she spins round the pole and dances a routine on the beat
+    const dancer = poleDancer({
+      top: pick(t, 0xff4fa3, 0x18e0ff, 0xb04cff, 0xffc81a),
+      bottom: pick(t, 0x2a2238, 0x15101f, 0x15101f, 0x15101f),
+      skin: pick(t, 0xe8b890, 0xc98e66, 0xf0c8a0, 0x8a5a3c),
+      hair: pick(t, 0x3a2418, 0x15101f, 0xe8d36a, 0xff4fa3),
+      shoes: pick(t, 0x2a2238, 0xd6314a, 0xdfe6f2, 0xffc81a),
+      lit: t === 4 ? glow(pick(t, 0, 0, 0, 0xffc81a), 0.45) : undefined,
+    }, 0.3, 1.3);
+    dancer.position.y = 0.16;
+    g.add(dancer);
   },
   bar_straight: (g, t) => {
     // 1 plywood and a plank for the bottles · 2 wood, blue top, neon · 3 walnut, marble, brass rail, lit glass shelves · 4 black lacquer, onyx, gold, mirror and pendant lamps
@@ -266,7 +375,7 @@ const TIERED: Record<string, Builder> = {
       const cone = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.45, 0.07, 20), toon(t === 1 ? 0x2a2a30 : 0x16142e));
       cone.rotation.x = Math.PI / 2;
       cone.position.set(0, y, pick(t, 0.2, 0.25, 0.28, 0.26));
-      g.add(cone);
+      g.add(pump(cone));
       g.add(ball(r * 0.3, t === 1 ? 0x55555f : 0x4a456f, 0, y, pick(t, 0.24, 0.29, 0.32, 0.3), { detail: 1, outline: false }));
     }
     if (t >= 2) g.add(box(0.3, 0.05, 0.03, 0x18e0ff, 0, h - 0.12, 0.27, glow(0x18e0ff)));
@@ -496,8 +605,8 @@ const BUILDERS: Record<string, Builder> = {
     const body = pick(t, 0x4a4a54, 0x1c1530, 0x15101f, 0x15101f);
     g.add(box(0.5, 1.9, 0.5, body, 0, 0, 0, undefined, 0.04));
     for (const [y, r] of [[0.35, 0.17], [0.85, 0.15], [1.4, 0.11]] as const) {
-      g.add(cyl(r, r, 0.04, pick(t, 0x2a2a34, 0x5a5c78, 0xdfe6f2, 0xffc81a), 0, y, 0.26, 18).rotateX(Math.PI / 2));
-      g.add(cyl(r * 0.45, r * 0.45, 0.05, pick(t, 0x3a3a44, 0x2a2238, 0x8f96b4, 0x15101f), 0, y, 0.27, 12).rotateX(Math.PI / 2));
+      g.add(pump(cyl(r, r, 0.04, pick(t, 0x2a2a34, 0x5a5c78, 0xdfe6f2, 0xffc81a), 0, y, 0.26, 18).rotateX(Math.PI / 2)));
+      g.add(pump(cyl(r * 0.45, r * 0.45, 0.05, pick(t, 0x3a3a44, 0x2a2238, 0x8f96b4, 0x15101f), 0, y, 0.27, 12).rotateX(Math.PI / 2), 1.4));
     }
     g.add(box(0.46, 0.04, 0.46, pick(t, 0x6a6c78, 0x5ec8ff, 0x5ec8ff, 0xffd860), 0, 1.9, 0, t === 1 ? undefined : glow(pick(t, 0x6a6c78, 0x5ec8ff, 0x5ec8ff, 0xffd860), 1.2), 0.01));
   },
@@ -505,8 +614,8 @@ const BUILDERS: Record<string, Builder> = {
     const body = pick(t, 0x4a4a54, 0x1c1530, 0x15101f, 0x15101f);
     g.add(box(1.9, 0.85, 0.85, body, 0, 0, 0, undefined, 0.05));
     for (const x of [-0.5, 0.5]) {
-      g.add(cyl(0.33, 0.33, 0.05, pick(t, 0x2a2a34, 0xd6314a, 0xdfe6f2, 0xffc81a), x, 0.42, 0.43, 22).rotateX(Math.PI / 2));
-      g.add(cyl(0.15, 0.15, 0.07, 0x15101f, x, 0.42, 0.45, 14).rotateX(Math.PI / 2));
+      g.add(pump(cyl(0.33, 0.33, 0.05, pick(t, 0x2a2a34, 0xd6314a, 0xdfe6f2, 0xffc81a), x, 0.42, 0.43, 22).rotateX(Math.PI / 2), 1.2));
+      g.add(pump(cyl(0.15, 0.15, 0.07, 0x15101f, x, 0.42, 0.45, 14).rotateX(Math.PI / 2), 1.6));
     }
     if (t >= 2) g.add(box(1.8, 0.03, 0.03, pick(t, 0, 0xd6314a, 0x5ec8ff, 0xffd860), 0, 0.82, 0.43, glow(pick(t, 0, 0xd6314a, 0x5ec8ff, 0xffd860), 1.5), 0.01));
   },
@@ -522,7 +631,25 @@ const BUILDERS: Record<string, Builder> = {
     g.add(box(0.7, 0.34, 0.44, pick(t, 0x4a4a54, 0x1c1530, 0x2a2a3a, 0x15101f), 0, 0, 0, undefined, 0.05));
     g.add(cyl(0.08, 0.08, 0.2, 0x15101f, 0.25, 0.3, 0.2, 10).rotateX(Math.PI / 2.4));
     g.add(box(0.18, 0.04, 0.04, pick(t, 0x8f96b4, 0x3ddc97, 0x5ec8ff, 0xffd860), -0.2, 0.34, 0.2, glow(pick(t, 0x8f96b4, 0x3ddc97, 0x5ec8ff, 0xffd860), 1), 0.01));
-    for (const [x, y, z, r] of [[0.3, 0.52, 0.34, 0.14], [0.42, 0.7, 0.4, 0.18], [0.55, 0.92, 0.46, 0.22]] as const) g.add(ball(r, 0xe8ecf8, x, y, z, { detail: 1, opacity: 0.35, outline: false }));
+    // puffs of smoke leave the nozzle, swell, drift and fade; it blows harder on the kick
+    const puffs: Array<{ m: THREE.Mesh; mat: THREE.MeshToonMaterial; seed: number }> = [];
+    for (let i = 0; i < 9; i++) {
+      const m = ball(0.16, 0xe8ecf8, 0.3, 0.4, 0.3, { detail: 1, opacity: 0.4, outline: false });
+      puffs.push({ m, mat: m.material as THREE.MeshToonMaterial, seed: i / 9 });
+      g.add(m);
+    }
+    let blow = 0;
+    puffs[0].m.userData.tick = ((time, _b, pulse, dt) => {
+      blow += Math.min(dt, 0.1) * (0.28 + 0.25 * pulse);
+      for (const p of puffs) {
+        const f = (blow + p.seed) % 1;
+        const side = Math.sin(p.seed * 37) * 0.6;
+        p.m.position.set(0.3 + f * (1.4 + side * 0.5), 0.4 + f * 0.9 - f * f * 0.5, 0.3 + f * (1.2 - side));
+        p.m.scale.setScalar(0.6 + f * 3.2);
+        p.mat.opacity = 0.42 * Math.sin(Math.PI * Math.min(1, f * 1.15)) * (0.8 + 0.2 * Math.sin(time * 3 + p.seed * 9));
+        p.m.visible = p.mat.opacity > 0.01;
+      }
+    }) as PropTick;
   },
   led_wall: (g, t) => {
     g.add(box(2.95, 1.7, 0.16, pick(t, 0x2a2a34, 0x15101f, 0x15101f, 0x15101f), 0, 0.2, 0, undefined, 0.03));
@@ -700,37 +827,15 @@ const BUILDERS: Record<string, Builder> = {
     g.add(torus(0.47, 0.03, neon, 0, 0.22, 0, t === 1 ? undefined : glow(neon, 1.4), Math.PI / 2));
     g.add(cyl(0.03, 0.03, 1.9, CHROME, 0, 0.22, 0, 8));
     g.add(cyl(0.2, 0.2, 0.04, pick(t, 0x4a4a54, 0x2a2238, 0xdfe6f2, 0xffc81a), 0, 2.1, 0, 14));
-    const turn = new THREE.Group();
-    turn.userData.spin = 1.2;
-    const top = pick(t, 0xff4fa3, 0x18e0ff, 0xb04cff, 0xffc81a);
-    const skin = pick(t, 0xe8b890, 0xc98e66, 0xf0c8a0, 0x8a5a3c);
-    const hair = pick(t, 0x3a2418, 0x15101f, 0xe8d36a, 0xff4fa3);
-    const cap = (r: number, len: number, color: number, x: number, y: number, z: number): THREE.Mesh => {
-      const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), toon(color));
-      m.position.set(x, y, z);
-      return m;
-    };
-    const d = new THREE.Group();
-    d.position.set(0.17, 0.22, 0);
-    d.rotation.y = -Math.PI / 2;
-    d.scale.setScalar(1.0);
-    d.add(cap(0.05, 0.3, skin, -0.06, 0.25, 0), cap(0.05, 0.3, skin, 0.06, 0.25, 0.01));
-    const hips = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), toon(0x15101f));
-    hips.scale.set(1.1, 0.75, 0.85);
-    hips.position.set(0, 0.56, 0);
-    d.add(hips, cap(0.065, 0.1, skin, 0, 0.68, 0));
-    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), toon(top));
-    chest.scale.set(1.05, 1.1, 0.85);
-    chest.position.set(0, 0.84, 0);
-    d.add(chest, ball(0.095, skin, 0, 1.06, 0.01, { detail: 2 }));
-    const mane = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), toon(hair));
-    mane.scale.set(1.05, 1.25, 0.95);
-    mane.position.set(0, 1.06, -0.03);
-    const arm = cap(0.03, 0.3, skin, 0.03, 1.05, 0.1);
-    arm.rotation.x = 0.6;
-    d.add(mane, arm);
-    turn.add(d);
-    g.add(turn);
+    const dancer = poleDancer({
+      top: pick(t, 0xff4fa3, 0x18e0ff, 0xb04cff, 0xffc81a),
+      bottom: 0x15101f,
+      skin: pick(t, 0xe8b890, 0xc98e66, 0xf0c8a0, 0x8a5a3c),
+      hair: pick(t, 0x3a2418, 0x15101f, 0xe8d36a, 0xff4fa3),
+      shoes: pick(t, 0x2a2238, 0xd6314a, 0xdfe6f2, 0xffc81a),
+    }, 0.2, 1.0);
+    dancer.position.y = 0.22;
+    g.add(dancer);
   },
   photo_booth: (g, t) => {
     const c = pick(t, 0xb06a3a, 0xd6314a, 0x5ec8ff, 0xffc81a);
@@ -783,12 +888,38 @@ const BUILDERS: Record<string, Builder> = {
     g.add(cyl(0.2, 0.24, 0.1, CHROME, 0, 0, 0, 16));
     g.add(cyl(0.1, 0.15, 1.2, PLUM, 0, 0.1, 0, 12));
     g.add(torus(0.13, 0.02, 0x35f08a, 0, 0.6, 0, glow(0x35f08a, 1), Math.PI / 2));
-    g.add(ball(0.2, 0x35f08a, 0, 1.45, 0, { detail: 2, ...glow(0x35f08a, 1.4) }));
-    for (const [x, c] of [[-0.3, 0x35f08a], [0, 0xff3da6], [0.3, 0x18e0ff]] as const) {
-      const beam = box(0.035, 0.035, 1.0, c, x * 0.7, 1.4, 0.55, glow(c, 1.6));
-      beam.rotation.y = x;
-      g.add(beam);
+    const headMat = toon(0x35f08a, glow(0x35f08a, 1.4));
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 2), headMat);
+    head.position.y = 1.45;
+    g.add(head);
+    // a fan of beams that sweeps the room and changes colour; brighter on every kick
+    const fan = new THREE.Group();
+    fan.position.y = 1.45;
+    const beams: THREE.MeshBasicMaterial[] = [];
+    const geo = new THREE.CylinderGeometry(0.018, 0.018, 4.5, 6, 1, true);
+    geo.rotateX(Math.PI / 2);
+    geo.translate(0, 0, 2.25);
+    for (let i = 0; i < 6; i++) {
+      const m = new THREE.MeshBasicMaterial({ color: 0x35f08a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
+      m.userData.outlineParameters = { visible: false };
+      const beam = new THREE.Mesh(geo, m);
+      beam.rotation.y = (i - 2.5) * 0.22;
+      fan.add(beam);
+      beams.push(m);
     }
+    g.add(fan);
+    fan.userData.tick = ((time, beat, pulse) => {
+      fan.rotation.y = Math.sin(time * 0.7) * 1.3;
+      fan.rotation.x = 0.32 + Math.sin(time * 1.3) * 0.18;
+      const spread = 0.16 + 0.08 * Math.sin(beat * Math.PI * 0.25);
+      beams.forEach((m, i) => {
+        (fan.children[i] as THREE.Mesh).rotation.y = (i - 2.5) * spread;
+        m.color.setHSL((time * 0.08 + Math.floor(beat / 4) * 0.33 + i * 0.03) % 1, 1, 0.55);
+        m.opacity = 0.45 + 0.5 * pulse;
+      });
+      headMat.emissive.copy(beams[0].color);
+      headMat.color.copy(beams[0].color);
+    }) as PropTick;
   },
   tv_stand: (g) => {
     g.add(box(1.0, 0.5, 0.5, WOOD_DARK, 0, 0, 0, undefined, 0.05));

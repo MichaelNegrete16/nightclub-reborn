@@ -1,5 +1,6 @@
 import { BY_ID } from '../core/catalog';
 import { sellValue, tierOfItem } from '../core/club';
+import { launderPrice } from '../core/kits';
 import { TIER_NAMES, upgradeCost } from '../core/tiers';
 import type { ClubView } from '../render/club';
 import { button, el, fmt } from './dom';
@@ -47,6 +48,7 @@ export class ContextBar {
       ...(tier < 4 ? [act('star', `Mejorar ${fmt(upgradeCost(def.price, tier))}`, () => v.upgradeSelected(), 'upgrade')] : []),
       act('rotate', 'Girar', () => v.rotate()),
       act('move', 'Mover', () => v.startMove()),
+      ...((sel.hot ?? 0) > Date.now() ? [act('coin', `Limpiar ${fmt(launderPrice({ uid: sel.uid, id: sel.id, tier }))}`, () => v.launder(sel.uid), 'upgrade')] : []),
       act('stash', 'Guardar', () => v.stashSelected()),
       act('sell', `Vender +${fmt(sellValue(def, tier))}`, () => v.sellSelected(), 'danger'),
     );

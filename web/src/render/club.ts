@@ -46,7 +46,7 @@ import { RADIUS_CELLS, buildingOrigin, lotOrigin, simulatedNeighbors, type Neigh
 import { buildCity, type City } from './city';
 import { Environment } from './environment';
 import { neon } from './comic';
-import { buildProp } from './props';
+import { buildProp, type PropTick } from './props';
 import { toon } from './toon';
 
 const ORIGIN = { x: YARD, z: YARD }; // the building sits this many tiles inside the parcel
@@ -75,6 +75,8 @@ export interface ClubHooks {
   onPhaseUp(phase: number): void;
   /** a short message for the player (errors, confirmations) */
   onToast(message: string, kind?: 'ok' | 'bad'): void;
+  /** a real star walked in: show their portrait */
+  onStar?(celeb: string, name: string): void;
   /** the VIP at the door changed (arrived, was checked, left): `null` when nobody is waiting */
   onVip(vip: { id: number; vip: Vip } | null): void;
   /** the Brigada took the player to prison: play the arrest scene */
@@ -139,6 +141,8 @@ export class ClubView {
   private down: { x: number; y: number; t: number } | null = null;
   private pulse: THREE.MeshToonMaterial[] = [];
   private spinners: THREE.Object3D[] = [];
+  /** props that animate themselves (dancers, lasers, smoke, speaker cones) */
+  private ticks: PropTick[] = [];
   private builtPhase = 0;
 
   readonly sim = new GuestSim((Math.random() * 1e9) | 0);
@@ -354,6 +358,9 @@ export class ClubView {
       m.emissiveIntensity = sounding ? 0.3 + 0.5 * wave + 0.4 * pulse : 0.25;
     });
     for (const o of this.spinners) o.rotation.y += dt * (o.userData.spin as number);
+    // without music the props keep moving on a steady 120 bpm clock
+    const clock = sounding ? beat : time * 2;
+    for (const tick of this.ticks) tick(time, clock, pulse, dt);
     const sh = this.shell;
     if (sh) {
       // the finishes that move: RGB neon cycles through the rainbow, the glass floor pulses, laser light shifts colour
@@ -678,13 +685,13 @@ export class ClubView {
       this.pending.push(e);
       if (e.amount > 0) this.incomeLog.push([now, e.amount]);
       if (e.kind === 'drink' || e.kind === 'show') this.popup(e.x, e.y, e.amount);
-      if (e.kind === 'vip') this.hooks.onToast(`¡Era ${this.vipName()} de verdad! +${e.amount} monedas y más gente en camino.`, 'ok');
+      if (e.kind === 'vip') {
+        const v = this.sim.guests.find((g) => g.vip && !g.leaving)?.vip;
+        this.hooks.onToast(`¡Era ${v?.name ?? 'la estrella'} de verdad! +${e.amount} monedas y más gente en camino.`, 'ok');
+        if (v) this.hooks.onStar?.(v.celeb, v.name);
+      }
       if (e.kind === 'fraud') this.hooks.onToast(`Era un farsante: se colaron y te costó ${-e.amount} monedas.`, 'bad');
     }
-  }
-
-  private vipName(): string {
-    return this.sim.guests.find((g) => g.vip && !g.leaving)?.vip?.name ?? 'la estrella';
   }
 
   private flushEarnings(): void {
@@ -799,10 +806,23 @@ export class ClubView {
   stashSelected(): void {
     const it = this.selected();
     if (!it) return;
-    this.commit(stashItem(this.state, it.uid).state);
+    const r = stashItem(this.state, it.uid);
+    if (r.error) return this.say(r.error);
+    const toBag = r.state.loot.length > this.state.loot.length;
+    this.commit(r.state);
     this.selectedUid = null;
-    this.say(`${BY_ID.get(it.id)!.name} guardado en el inventario`);
+    this.say(toBag ? `${BY_ID.get(it.id)!.name} (robado) vuelve a tu bolsa` : `${BY_ID.get(it.id)!.name} guardado en el inventario`);
     this.refreshHighlight();
+  }
+
+  /** The server cleaned a stolen piece (in the bag or on display) and charged for it: make the local copy say the same. */
+  applyLaunder(uid: string, price: number): void {
+    this.patchState((s) => ({
+      ...s,
+      coins: s.coins - price,
+      loot: s.loot.map((l) => (l.uid === uid ? { ...l, hotUntil: 0 } : l)),
+      items: s.items.map((i) => (i.uid === uid && i.hot ? { ...i, hot: undefined } : i)),
+    }));
   }
 
   /** Buy into the inventory (shop). Returns the error, if any. */
@@ -1245,6 +1265,7 @@ export class ClubView {
     disposeChildren(this.items);
     this.pulse = [];
     this.spinners = [];
+    this.ticks = [];
     this.fx.clearSources();
     for (const it of this.state.items) {
       const def = BY_ID.get(it.id);
@@ -1254,6 +1275,7 @@ export class ClubView {
       this.place(g, def, it.x, it.y, it.rot);
       g.traverse((o) => {
         if (o.userData.spin !== undefined) this.spinners.push(o);
+        if (typeof o.userData.tick === 'function') this.ticks.push(o.userData.tick as PropTick);
         const m = o as THREE.Mesh;
         if (m.isMesh && m.userData.pulse) this.pulse.push(m.material as THREE.MeshToonMaterial);
       });

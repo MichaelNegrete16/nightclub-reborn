@@ -6,8 +6,8 @@ import { canvasTexture } from './comic';
 import { toon } from './toon';
 
 /**
- * The part of the lot the club has not grown into yet is a reserved construction zone: bare ground inside a fence, with
- * barrier tape around the next phase and a sign saying at which level it opens. It shrinks as the building grows.
+ * The part of the lot the club has not grown into yet: bare ground inside a low hedge, and a billboard saying what the next
+ * expansion is, at which level it opens and what it costs. It shrinks as the building grows.
  */
 export function buildYard(phaseId: number): THREE.Group {
 const r = new THREE.Group();
@@ -24,104 +24,88 @@ const r = new THREE.Group();
   flatStd(last.w, last.h, last.w / 2, last.h / 2, -0.055, 0x8c846e); // the reserved ground
   if (next) flatStd(next.w, next.h, next.w / 2, next.h / 2, -0.05, 0x9c9378); // the next phase: freshly cleared
 
-  const post = toon(0x6a6f84, { outline: false });
-  const rail = toon(0x8a8fa6, { outline: false });
-  for (const [x1, z1, x2, z2] of [[0, last.h, last.w, last.h], [last.w, 0, last.w, last.h]] as const) {
+  // a low clipped hedge around the lot (instead of a fence), with a gap in front of the door
+  const hedge = toon(0x2f7d4a);
+  const hedgeTop = toon(0x3c9a5c, { outline: false });
+  const gate0 = Math.floor(PHASES[phaseId - 1].w / 2) - 3.5;
+  const gate1 = gate0 + 7;
+  const runs: Array<[number, number, number, number]> = [
+    [0, last.h, gate0, last.h],
+    [gate1, last.h, last.w, last.h],
+    [last.w, 0, last.w, last.h],
+  ];
+  for (const [x1, z1, x2, z2] of runs) {
     const len = Math.hypot(x2 - x1, z2 - z1);
-    const steps = Math.round(len / 3);
-    // the south fence has a gate in front of the door so the line and the player can get out to the street
-    const south = z1 === z2 && z1 === last.h;
-    const gate0 = Math.floor(PHASES[phaseId - 1].w / 2) - 3.5;
-    const gate1 = gate0 + 7;
-    for (let i = 0; i <= steps; i++) {
-      const px = x1 + ((x2 - x1) * i) / steps;
-      if (south && px > gate0 - 1 && px < gate1 + 1) continue;
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.3, 0.2), post);
-      p.position.set(px, 0.65, z1 + ((z2 - z1) * i) / steps);
-      r.add(p);
-    }
-    const spans: Array<[number, number]> = south ? [[x1, gate0], [gate1, x2]] : [[x1, x2]];
-    for (const [a, b] of south ? spans : [[0, 0] as [number, number]]) {
-      const sx1 = south ? a : x1;
-      const sx2 = south ? b : x2;
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(sx2 - sx1) || 0.08, 0.08, Math.abs(z2 - z1) || 0.08), rail);
-      bar.position.set((sx1 + sx2) / 2, 1.05, (z1 + z2) / 2);
-      r.add(bar);
-    }
+    if (len < 0.4) continue;
+    const alongX = z1 === z2;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.7, 0.75, alongX ? 0.7 : len), hedge);
+    body.position.set((x1 + x2) / 2, 0.375, (z1 + z2) / 2);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len - 0.1 : 0.6, 0.08, alongX ? 0.6 : len - 0.1), hedgeTop);
+    top.position.set((x1 + x2) / 2, 0.79, (z1 + z2) / 2);
+    r.add(body, top);
   }
 
   if (next) {
-    const tex = canvasTexture(64, 16, (g) => {
-      for (let i = 0; i < 8; i++) {
-        g.fillStyle = i % 2 ? '#15151c' : '#ffd21e';
-        g.fillRect(i * 8, 0, 8, 16);
-      }
-    });
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    // the tape leaves the carpet free: it runs on both sides of the way in
-    const mid = Math.floor(PHASES[phaseId - 1].w / 2);
-    const gl = mid - 2.5;
-    const gr = mid + 2.5;
-    const segs: Array<[number, number, number, number]> = [[next.w, next.h / 2, 0.1, next.h]];
-    if (gl > 0.5) segs.push([gl / 2, next.h, gl, 0.1]);
-    if (next.w - gr > 0.5) segs.push([gr + (next.w - gr) / 2, next.h, next.w - gr, 0.1]);
-    for (const [cx, cz, w, d] of segs) {
-      const t = tex.clone();
-      t.needsUpdate = true;
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(Math.max(w, d) / 1.6, 1);
-      const tapeMat = new THREE.MeshBasicMaterial({ map: t });
-      tapeMat.userData.outlineParameters = { visible: false };
-      const tape = new THREE.Mesh(new THREE.BoxGeometry(w || 0.06, 0.3, d || 0.06), tapeMat);
-      tape.position.set(cx, 0.9, cz);
-      r.add(tape);
-    }
-    // cones at the corners and a few crates
-    for (const [x, z] of [[next.w, next.h], [next.w - 0.2, 0.4], [0.4, next.h - 0.2]] as const) {
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), toon(0xff7a1e));
-      cone.position.set(x, 0.35, z);
-      r.add(cone);
-    }
-    const crate = (x: number, z: number, s: number) => {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), toon(0xa8784a));
-      c.position.set(x, s / 2, z);
-      c.rotation.y = x * 0.7;
-      r.add(c);
-    };
-    crate(next.w + 2.4, next.h * 0.4, 1.0);
-    crate(next.w + 3.6, next.h * 0.4 + 1.2, 0.8);
-    crate(next.w * 0.7, next.h + 2.6, 0.9);
-    // sign: where the club grows next
-    const board = canvasTexture(512, 160, (g) => {
-      g.fillStyle = '#ffd21e';
-      g.fillRect(0, 0, 512, 160);
-      g.fillStyle = '#15151c';
-      g.fillRect(8, 8, 496, 144);
-      g.fillStyle = '#ffd21e';
+    // a billboard on the lot: where the club grows next, at which level and for how much
+    const W = 5.4;
+    const H = 1.9;
+    const board = canvasTexture(1024, Math.round((1024 * H) / W), (g) => {
+      const cw = g.canvas.width;
+      const ch = g.canvas.height;
+      const bg = g.createLinearGradient(0, 0, 0, ch);
+      bg.addColorStop(0, '#241a44');
+      bg.addColorStop(1, '#150d26');
+      g.fillStyle = bg;
+      g.fillRect(0, 0, cw, ch);
+      g.fillStyle = '#f5b91d';
+      g.fillRect(0, 0, cw, 70);
       g.textAlign = 'center';
+      g.textBaseline = 'middle';
       // each line shrinks until it fits the board
-      const fitLine = (text: string, px: number, y: number) => {
-        const font = (s: number) => `900 ${s}px "Arial Black", Impact, sans-serif`;
+      const fitLine = (text: string, px: number, y: number, color: string) => {
+        const font = (sz: number) => `900 ${sz}px "Arial Black", Impact, sans-serif`;
         g.font = font(px);
-        const w = g.measureText(text).width;
-        if (w > 470) px *= 470 / w;
+        const tw = g.measureText(text).width;
+        if (tw > cw * 0.9) px *= (cw * 0.9) / tw;
         g.font = font(px);
-        g.fillText(text, 256, y);
+        g.fillStyle = color;
+        g.fillText(text, cw / 2, y);
       };
-      fitLine('PRÓXIMA AMPLIACIÓN', 52, 70);
-      fitLine(`${next.name} · nivel ${PHASE_LEVELS[phaseId]} · ${EXPANSION_PRICE[next.id].toLocaleString('es-CO')}`, 44, 128);
+      fitLine('PRÓXIMA AMPLIACIÓN', 50, 37, '#150d26');
+      fitLine(next.name.toUpperCase(), 78, 150, '#ffffff');
+      fitLine(`Nivel ${PHASE_LEVELS[phaseId]}  ·  ${EXPANSION_PRICE[next.id].toLocaleString('es-CO')} monedas`, 46, 250, '#f5b91d');
+      g.strokeStyle = '#ff4fa3';
+      g.lineWidth = 10;
+      g.strokeRect(5, 5, cw - 10, ch - 10);
     });
-    const signMat = new THREE.MeshBasicMaterial({ map: board });
-    signMat.userData.outlineParameters = { visible: false };
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.62), signMat);
-    sign.position.set(next.w + 4.5, 2.6, next.h + 3);
+    const faceMat = new THREE.MeshBasicMaterial({ map: board });
+    faceMat.userData.outlineParameters = { visible: false };
+    const steel = toon(0x3c3f52);
+    const sign = new THREE.Group();
+    const D = 0.2;
+    const backMat = toon(0x241a44);
+    sign.add(new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [backMat, backMat, backMat, backMat, faceMat, backMat]));
+    const frame = toon(0xd9dbe6);
+    for (const [fw, fh, fx, fy] of [[W + 0.2, 0.1, 0, H / 2 + 0.05], [W + 0.2, 0.1, 0, -H / 2 - 0.05], [0.1, H, -W / 2 - 0.05, 0], [0.1, H, W / 2 + 0.05, 0]] as const) {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, D + 0.04), frame);
+      f.position.set(fx, fy, 0);
+      sign.add(f);
+    }
+    // two posts behind the board, on concrete feet, and two lamps lighting it from above
+    for (const dx of [-W * 0.3, W * 0.3]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.4 + H, 0.18), steel);
+      leg.position.set(dx, -0.7, -D / 2 - 0.1);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.5), toon(0x9a9a9a));
+      foot.position.set(dx, -1.4 - H / 2 + 0.12, -D / 2 - 0.1);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.5), steel);
+      arm.position.set(dx, H / 2 + 0.2, 0.15);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.16), toon(0xfff1b0, { emissive: 0xffd36b, emissiveIntensity: 1.3, outline: false }));
+      lamp.position.set(dx, H / 2 + 0.17, 0.42);
+      sign.add(leg, foot, arm, lamp);
+    }
+    sign.position.set(next.w + 4.5, 1.4 + H / 2, next.h + 3);
     sign.rotation.y = Math.PI / 4;
     r.add(sign);
-    for (const o of [-1.9, 1.9]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.7, 0.18), post);
-      leg.position.set(next.w + 4.5 + o * 0.7, 1.35, next.h + 3 - o * 0.7);
-      r.add(leg);
-    }
   }
   return r;
 }

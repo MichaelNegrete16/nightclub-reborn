@@ -1,5 +1,5 @@
 import { TIER_LEVEL, TIER_NAMES, upgradeCost } from '../core/tiers';
-import { earningOf } from '../core/income';
+import { earningOf, FULL_HOUSE } from '../core/income';
 import { BY_ID, CATALOG, CATEGORIES, type CategoryId, type ItemDef } from '../core/catalog';
 import { levelNow, owned, sellValue } from '../core/club';
 import type { ClubView } from '../render/club';
@@ -143,8 +143,8 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
       box.append(el('b', '', `Genera ingresos: +${earn.perMin[0]}/min`));
       box.append(el('span', '', TIER_NAMES.map((n, i) => `${n} +${earn.perMin[i]}`).join(' · ') + ' por minuto'));
       box.append(el('small', '', earn.kind === 'show'
-        ? `Con el club abierto, música y gente mirándola (se llena con 8 personas cerca). La bailarina cobra ${earn.wage[0]}/min en la versión 1.`
-        : 'Con el club abierto, música y gente dentro (se llena con 8 personas). Es premio de prestigio: no cuesta mantenimiento.'));
+        ? `Con el club abierto, música y gente mirándola (paga completo con ${FULL_HOUSE} personas cerca). La bailarina cobra ${earn.wage[0]}/min en la versión 1.`
+        : `Con el club abierto, música y gente cerca (paga completo con ${FULL_HOUSE} personas alrededor). No cuesta mantenimiento.`));
       detail.append(box);
     }
 

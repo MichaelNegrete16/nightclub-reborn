@@ -7,7 +7,8 @@ import { COMFORT_PER_TIER, COVER_PER_TIER, upkeepPerMinute } from './renovation.
 import { MOOD_TARGET, VIP_RATING, liking, tasteFor, type Genre } from './music.ts';
 import { levelOf } from './progression.ts';
 import { composeReview, type Facts, type Tag } from './reviews.ts';
-import { earningOf } from './income.ts';
+import { earningOf, FULL_HOUSE } from './income.ts';
+import { CELEBS } from './celebs.ts';
 import { WAGE_EVERY, perksOfStaff, wagePerMinute, type StaffPerks } from './staff.ts';
 
 const SHOW_EVERY = 10;
@@ -30,6 +31,8 @@ export interface Slot {
 
 /** A guest who claims to be famous. Only the player can find out (by checking) whether it is true. */
 export interface Vip {
+  /** which famous person (core/celebs.ts): the portrait is drawn from it */
+  celeb: string;
   name: string;
   /** what they claim to be */
   title: string;
@@ -88,16 +91,6 @@ export interface GuestEvent {
 /** Why someone in line did not get in. */
 export type QueueNote = { kind: 'full' | 'impatient' | 'vip-left'; name?: string } | { kind: 'review'; stars: number; text: string; tags: Tag[]; who: string };
 
-const VIP_NAMES: Array<[string, string]> = [
-  ['Valentina Cruz', 'cantante de reguetón'],
-  ['DJ Kolibrí', 'DJ internacional'],
-  ['Mateo "El Rayo" Ortiz', 'futbolista'],
-  ['Sofía Lunar', 'influencer con 3 millones de seguidores'],
-  ['Los Hermanos Brisa', 'banda de salsa'],
-  ['Camilo Ávila', 'actor de telenovela'],
-  ['La Pantera Neón', 'campeona de baile'],
-  ['Andrés Vélez', 'modelo de pasarela'],
-];
 /** Cost of checking a VIP's story (the UI charges it). */
 export const VIP_CHECK_COST = 30;
 export const VIP_REAL_COVER = 150;
@@ -450,7 +443,7 @@ export class GuestSim {
   }
 
   /**
-   * The dancing cages and the trophies: every few seconds each one earns the tips of the people watching it (up to a full house of 8 around it).
+   * The dancing cages and the trophies: every few seconds each one earns the tips of the people watching it (up to a full house of FULL_HOUSE around it).
    * The better the version, the more it earns; the dancer's wage is charged with the rest of the staff.
    */
   private performShows(dt: number): void {
@@ -459,7 +452,7 @@ export class GuestSim {
       if (c.acc < SHOW_EVERY) continue;
       c.acc -= SHOW_EVERY;
       const watching = this.guests.filter((g) => !g.leaving && g.y < this.phase.h && Math.hypot(g.x - c.x, g.y - c.y) <= c.radius).length;
-      const amount = Math.round((c.rate * SHOW_EVERY) / 60 * Math.min(1, watching / 8));
+      const amount = Math.round((c.rate * SHOW_EVERY) / 60 * Math.min(1, watching / FULL_HOUSE));
       if (amount <= 0) continue;
       this.earned += amount;
       this.events.push({ x: c.x, y: c.y, amount, kind: 'show' });
@@ -512,8 +505,8 @@ export class GuestSim {
       };
       g.wait0 = g.patience;
       if (vip) {
-        const [name, title] = VIP_NAMES[Math.floor(this.rand() * VIP_NAMES.length)];
-        g.vip = { name, title, real: this.rand() < 0.6, checked: this.crew.checksVips };
+        const c = CELEBS[Math.floor(this.rand() * CELEBS.length)];
+        g.vip = { celeb: c.id, name: c.name, title: c.title, real: this.rand() < 0.6, checked: this.crew.checksVips };
         g.patience = 70;
         g.stay = this.range(90, 150);
         this.vipCooldown = 150;

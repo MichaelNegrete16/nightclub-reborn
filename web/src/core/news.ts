@@ -24,6 +24,53 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25m',
+    date: '25 de noviembre de 2026',
+    title: '12 canciones nuevas y arreglos de robos',
+    intro: 'Más dancehall, champeta y salsa para tu pista, y varios arreglos con las piezas robadas.',
+    entries: [
+      { kind: 'icon', ref: 'music', title: '12 canciones nuevas', text: 'Vybz Kartel (Fever y Conjugal Visit con Spice), Charly Black, Gyptian, Alkaline, Lil Silvio, Mosta Man, Kevin Florez, Reyes On The Mic, Jose Mc y Maelo Ruiz (salsa).', where: 'Música › Biblioteca' },
+      { kind: 'icon', ref: 'stash', title: 'Guardar objetos funciona', text: 'Si una pieza no se puede guardar (porque está mejorada) ahora te lo dice. Una pieza robada que sigue caliente vuelve a tu bolsa en vez de limpiarse gratis.', where: 'Seleccionar un objeto › Guardar' },
+      { kind: 'icon', ref: 'coin', title: 'Limpiar piezas robadas', text: 'Al pagar a Zeta, la pieza queda limpia de verdad y se te descuenta la plata. Ahora también puedes limpiar las piezas que ya tienes puestas, con el botón Limpiar al seleccionarlas.', where: 'Oficina › Botín, o al seleccionar la pieza' },
+    ],
+  },
+  {
+    id: '2026-11-25l',
+    date: '25 de noviembre de 2026',
+    title: 'Famosos con cara y más plata por decorar',
+    intro: 'Llegan estrellas criollas con su caricatura, y los shows, trofeos y la decoración pagan mucho más.',
+    entries: [
+      { kind: 'icon', ref: 'star', title: 'Famosos en caricatura', text: 'Ahora llegan 14 estrellas con sabor colombiano: el rey del vallenato con su sombrero vueltiao, una salsera caleña, el rey de la champeta, un goleador de la selección, un ciclista de montaña, una reina de la cumbia y más. En la puerta ves su caricatura y, si los investigas, el sello REAL o FALSO. Cuando entra uno de verdad, aparece su foto en grande.', where: 'La puerta del club (ambiente 78 o más)' },
+      { kind: 'item', ref: 'dance_cage', title: 'Los shows pagan el doble', text: 'La jaula y el podio dan el doble de propinas, y ahora pagan completo con solo 4 personas mirando (antes hacían falta 8).', where: 'Tienda › Shows' },
+      { kind: 'item', ref: 'gold_statue', title: 'Trofeos casi 3 veces más', text: 'Cada trofeo paga 8 por punto de lujo al minuto (antes 3), con gente cerca.', where: 'Tienda › Trofeos' },
+      { kind: 'item', ref: 'aquarium', title: 'La decoración también paga', text: 'Plantas, palmeras, acuarios, fuentes, arcades, neones y esculturas ahora generan monedas por minuto cuando hay gente cerca. Mira cuánto en la tienda.', where: 'Tienda › Decoración' },
+    ],
+  },
+  {
+    id: '2026-11-25k',
+    date: '25 de noviembre de 2026',
+    title: 'Los objetos cobran vida',
+    intro: 'Parlantes, humo, láseres y bailarinas ahora se mueven con la música.',
+    entries: [
+      { kind: 'item', ref: 'dance_cage', tier: 2, title: 'Las bailarinas bailan de verdad', text: 'Ya no giran como figurita de caja de música: dan vueltas al tubo, bailan de frente al público con los brazos arriba, bajan y suben por el tubo y hacen ondas con el cuerpo, al ritmo de la canción.', where: 'Jaula de baile y podio con tubo' },
+      { kind: 'item', ref: 'laser_tower', title: 'La torre láser dispara', text: 'Un abanico de rayos que barre la pista, cambia de color y brilla más en cada golpe del bajo.', where: 'Tienda › Luces' },
+      { kind: 'item', ref: 'fog_machine', title: 'La máquina de humo echa humo', text: 'Nubes que salen de la boquilla, crecen y se desvanecen; sopla más fuerte con el bajo.', where: 'Tienda › Luces' },
+      { kind: 'item', ref: 'speaker_tower', title: 'Los parlantes retumban', text: 'Los conos de todos los parlantes, la torre de sonido y el subwoofer bombean con cada golpe de la música.', where: 'Tienda › DJ' },
+    ],
+  },
+  {
+    id: '2026-11-25j',
+    date: '25 de noviembre de 2026',
+    title: 'Un exterior de lujo',
+    intro: 'Tu club se ve mucho mejor desde la calle.',
+    entries: [
+      { kind: 'icon', ref: 'facade', title: 'Adiós a la cinta amarilla', text: 'El terreno de la ampliación ahora tiene un seto bajo y ya no tapa la discoteca. Las cajas y los conos también se fueron.', where: 'Afuera del club' },
+      { kind: 'icon', ref: 'star', title: 'Letreros de verdad', text: 'El nombre del club es un cartel de madera pintada, una caja de neón con marco de metal o, con el letrero gigante, una marquesina dorada con bombillos y estrella.', where: 'Encima de la puerta' },
+      { kind: 'icon', ref: 'city', title: 'Valla de la próxima ampliación', text: 'Un cartel con patas y luces que dice qué local sigue, en qué nivel se abre y cuánto cuesta.', where: 'En el terreno, al lado del club' },
+      { kind: 'icon', ref: 'luxury', title: 'Fachada más elegante y 3 mejoras nuevas', text: 'Todos los clubes tienen zócalo, columnas en las esquinas, moldura y faroles en la puerta. Nuevas: Jardineras y palmeras (nivel 6), Luces en la fachada (nivel 8) y Entrada de mármol con columnas doradas (nivel 12).', where: 'Oficina › Fachada' },
+    ],
+  },
+  {
     id: '2026-11-25i',
     date: '25 de noviembre de 2026',
     title: 'El aforo ya no se queda en 40',

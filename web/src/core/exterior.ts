@@ -12,7 +12,7 @@ export interface Exterior {
   paint: string;
 }
 
-export type UpgradeGroup = 'paint' | 'sign' | 'awning' | 'rope' | 'lights';
+export type UpgradeGroup = 'paint' | 'sign' | 'awning' | 'rope' | 'lights' | 'decor';
 
 export interface Upgrade {
   id: string;
@@ -39,6 +39,10 @@ const BASE_UPGRADES: Upgrade[] = [
   { id: 'sign_neon', group: 'sign', name: 'Letrero de neón', desc: 'El nombre del club con luces. 10% más gente llega.', price: 600, unlockLevel: 4, tier: 1 },
   { id: 'lights', group: 'lights', name: 'Reflectores', desc: 'Dos haces de luz en la entrada. 5% más gente llega.', price: 700, unlockLevel: 5 },
   { id: 'sign_giant', group: 'sign', name: 'Letrero gigante', desc: 'Se ve desde toda la cuadra. 20% más gente llega.', price: 2500, unlockLevel: 10, tier: 2 },
+  // looks only: they make the outside feel expensive
+  { id: 'planters', group: 'decor', name: 'Jardineras y palmeras', desc: 'Palmeras y arbustos podados en el frente del club.', price: 1200, unlockLevel: 6 },
+  { id: 'uplights', group: 'decor', name: 'Luces en la fachada', desc: 'Franjas de luz que bañan las paredes y el borde del techo.', price: 1600, unlockLevel: 8 },
+  { id: 'columns', group: 'decor', name: 'Entrada de mármol', desc: 'Columnas doradas, zócalo de mármol y escalón en la puerta.', price: 3500, unlockLevel: 12 },
 ];
 
 /** facade prices are scaled (see pricing.ts) */
