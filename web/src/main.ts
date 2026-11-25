@@ -479,6 +479,7 @@ async function main() {
     ui,
     comic,
     catalogIds: CATALOG.map((d) => d.id),
+    renderer,
   };
 
   await ui.start();
