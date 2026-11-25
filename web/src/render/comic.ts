@@ -818,7 +818,7 @@ export class ComicStudio {
     const url = this.renderer.domElement.toDataURL('image/jpeg', 0.92);
     rig.scene.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.geometry) m.geometry.dispose();
+      if (m.geometry && !m.geometry.userData.shared) m.geometry.dispose();
       const mat = m.material as THREE.Material | THREE.Material[] | undefined;
       (Array.isArray(mat) ? mat : mat ? [mat] : []).forEach((x) => x.dispose());
     });
