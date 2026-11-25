@@ -29,7 +29,7 @@ function keyOf(mat: THREE.Material): string | null {
 function steady(mesh: THREE.Mesh, root: THREE.Object3D): boolean {
   if (mesh.userData.pulse || mesh.renderOrder !== 0) return false;
   for (let o: THREE.Object3D | null = mesh; o && o !== root; o = o.parent) {
-    if ((!o.visible && !o.userData.merged) || o.userData.spin !== undefined || o.userData.live) return false;
+    if ((!o.visible && !o.userData.merged) || o.userData.spin !== undefined || o.userData.live || o.userData.tick !== undefined) return false;
   }
   return true;
 }

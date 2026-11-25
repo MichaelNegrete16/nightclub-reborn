@@ -165,7 +165,8 @@ export type Goal =
   | { kind: 'renovation'; count: number }
   | { kind: 'phase'; phase: number }
   | { kind: 'tier'; tier: number; count: number }
-  | { kind: 'decor'; count: number }
+  /** finishes of the interior; `all` also counts the 5 basic ones every club starts with */
+  | { kind: 'decor'; count: number; all?: boolean }
   | { kind: 'heists'; count: number }
   /** the sound system (speakers, towers, subs and booths) averages at least this version (1 to 4) */
   | { kind: 'sound'; value: number };
@@ -201,7 +202,6 @@ const BASE_MISSIONS: Mission[] = [
   { id: 'upgrade1', chapter: 1, title: 'Equipo mejor', hint: 'Toca un objeto de tu club y pulsa Mejorar: la barra, los altavoces o la cabina pasan a la versión Profesional (nivel 4). Se ve mejor, y el sonido sale más limpio.', goal: { kind: 'tier', tier: 2, count: 1 }, reward: { coins: 300, xp: 120 } },
   { id: 'decor1', chapter: 1, title: 'Una mano de pintura', hint: 'Oficina › Decorar el interior: compra una pintura para las paredes (nivel 2). El sótano ya no tiene que verse como un sótano.', goal: { kind: 'decor', count: 1 }, reward: { coins: 300, xp: 100 } },
   { id: 'decor4', chapter: 1, title: 'Un local con estilo', hint: 'Compra 4 acabados para el interior: paredes, suelo, molduras, luces o cuadros.', goal: { kind: 'decor', count: 4 }, reward: { coins: 800, xp: 200 } },
-  { id: 'songs1', chapter: 1, title: 'Tu propia música', hint: 'Toca la canción que suena (arriba) y sube una canción tuya. Tus invitados tienen gustos: míralos.', goal: { kind: 'songs', count: 1 }, reward: { coins: 300, xp: 80 } },
   { id: 'facade1', chapter: 1, title: 'Cara nueva', hint: 'Oficina › Ver la fachada: compra una pintura, el toldo o el cordón de terciopelo.', goal: { kind: 'facade', count: 1 }, reward: { coins: 500, xp: 80 } },
   { id: 'tiles10', chapter: 1, title: 'Pista grande', hint: 'Llega a 10 baldosas de baile en tu piso.', goal: { kind: 'tiles', count: 10 }, reward: { coins: 300, xp: 60 } },
   { id: 'guests40', chapter: 1, title: 'Casa llena', hint: 'Deja entrar a 40 invitados en total. Si hay fila afuera, vas bien.', goal: { kind: 'guests', count: 40 }, reward: { coins: 500, xp: 100 } },
@@ -235,7 +235,6 @@ const BASE_MISSIONS: Mission[] = [
   { id: 'speakers3', chapter: 2, title: 'Que se oiga', hint: 'Ten 3 altavoces en tu club.', goal: { kind: 'copies', id: 'speaker', count: 3 }, reward: { coins: 1200, xp: 150 } },
   { id: 'velvet', chapter: 2, title: 'Cuerda de terciopelo', hint: 'Compra la cuerda de terciopelo (nivel 9) para ordenar tu club.', goal: { kind: 'placed', ids: ['velvet_rope'], count: 1 }, reward: { coins: 1000, xp: 120 } },
   { id: 'staff3', chapter: 2, title: 'Equipo de tres', hint: 'Ten tres empleados contratados: un bartender, un DJ y un guardia.', goal: { kind: 'staff', count: 3 }, reward: { coins: 2500, xp: 250 } },
-  { id: 'songs3', chapter: 2, title: 'Tu playlist', hint: 'Sube o agrega 3 canciones propias para variar la música según el público.', goal: { kind: 'songs', count: 3 }, reward: { coins: 1500, xp: 200 } },
   { id: 'facade5', chapter: 2, title: 'Fachada con nombre', hint: 'Ten 5 mejoras de fachada, incluida alguna del letrero de neón o el gigante (nivel 10).', goal: { kind: 'facade', count: 5 }, reward: { coins: 3000, xp: 250 } },
   { id: 'sign_giant', chapter: 2, title: 'Letrero gigante', hint: 'Compra el letrero gigante (nivel 10): se ve desde toda la cuadra y trae más gente.', goal: { kind: 'upgrade', id: 'sign_giant' }, reward: { coins: 3000, xp: 250 } },
   { id: 'vip1', chapter: 2, title: 'Una estrella en la puerta', hint: 'Con ambiente 78 o más llegan los famosos. Déjalo pasar si es de verdad: si no tienes guardia lo investigas tú, y con guardia él ya lo investiga solo (algunos son farsantes: espera a uno real).', goal: { kind: 'vips', count: 1 }, reward: { coins: 3000, xp: 300 } },
@@ -247,7 +246,7 @@ const BASE_MISSIONS: Mission[] = [
 
   { id: 'dances100', chapter: 3, title: 'La pista no para', hint: 'Consigue que tus invitados terminen 100 bailes.', goal: { kind: 'dances', count: 100 }, reward: { coins: 3000, xp: 80 } },
   { id: 'elite1', chapter: 3, title: 'Lo mejor del mercado', hint: 'Mejora un objeto a la versión Élite (nivel 25): dorada, brillante, la mejor.', goal: { kind: 'tier', tier: 4, count: 1 }, reward: { coins: 6000, xp: 600 } },
-  { id: 'decor_all', chapter: 3, title: 'Todo el lujo', hint: 'Ten 18 acabados del interior: el local completo, de pared a pared.', goal: { kind: 'decor', count: 18 }, reward: { coins: 15000, xp: 900 } },
+  { id: 'decor_all', chapter: 3, title: 'Todo el lujo', hint: 'Ten 20 acabados del interior (cuentan los 5 básicos que ya vienen): el local completo, de pared a pared.', goal: { kind: 'decor', count: 20, all: true }, reward: { coins: 15000, xp: 900 } },
   { id: 'elite4', chapter: 3, title: 'Un club de élite', hint: 'Ten 4 objetos en versión Élite.', goal: { kind: 'tier', tier: 4, count: 4 }, reward: { coins: 20000, xp: 1200 } },
   { id: 'booth2', chapter: 3, title: 'Sonido de club', hint: 'Compra un reservado (nivel 13) y una bola disco.', goal: { kind: 'placed', ids: ['booth', 'disco_ball'], count: 2 }, reward: { coins: 4000, xp: 100 } },
   { id: 'laser', chapter: 3, title: 'Rayos láser', hint: 'Compra una torre láser (nivel 15) y haz que tu pista sea un espectáculo.', goal: { kind: 'placed', ids: ['laser_tower'], count: 1 }, reward: { coins: 4000, xp: 300 } },
@@ -257,7 +256,6 @@ const BASE_MISSIONS: Mission[] = [
   { id: 'aquarium', chapter: 3, title: 'Un acuario', hint: 'Compra el acuario (nivel 18): ningún otro club tiene uno.', goal: { kind: 'placed', ids: ['aquarium'], count: 1 }, reward: { coins: 6000, xp: 400 } },
   { id: 'vips5', chapter: 3, title: 'Club de famosos', hint: 'Deja pasar a 5 famosos de verdad. Los farsantes no cuentan: recházalos.', goal: { kind: 'vips', count: 5 }, reward: { coins: 10000, xp: 600 } },
   { id: 'rating90', chapter: 3, title: 'Ambiente perfecto', hint: 'Lleva el ambiente del club a 90.', goal: { kind: 'rating', value: 90 }, reward: { coins: 8000, xp: 500 } },
-  { id: 'songs8', chapter: 3, title: 'Una playlist de verdad', hint: 'Ten 8 canciones propias en tu lista.', goal: { kind: 'songs', count: 8 }, reward: { coins: 5000, xp: 300 } },
   { id: 'visits5', chapter: 3, title: 'Vida social', hint: 'Visita los clubes de 5 vecinos (en línea).', goal: { kind: 'visits', count: 5 }, reward: { coins: 5000, xp: 400 } },
   { id: 'phase4', chapter: 3, title: 'Más grande', hint: 'Llega al nivel 23: se abre la ampliación a Club grande.', goal: { kind: 'level', level: 23 }, reward: { coins: 8000 } },
   { id: 'expand4', chapter: 3, title: 'Más espacio', hint: 'Oficina › Ampliación del local: la obra más cara hasta ahora. Tu club será el Club grande.', goal: { kind: 'phase', phase: 4 }, reward: { coins: 30000, xp: 1200 } },
@@ -326,7 +324,7 @@ export function progressOf(m: Mission, state: ClubState): Progress {
     case 'copies': return { current: Math.min(state.items.filter((i) => i.id === g.id).length, g.count), target: g.count };
     case 'hired': return { current: Math.min(state.staff[g.role], g.count), target: g.count };
     case 'upgrade': return { current: state.exterior.owned.includes(g.id) ? 1 : 0, target: 1 };
-    case 'decor': return { current: Math.min(state.decor.owned.length - 5, g.count), target: g.count };
+    case 'decor': return { current: Math.min(state.decor.owned.length - (g.all ? 0 : 5), g.count), target: g.count };
     case 'tier': return { current: Math.min(state.items.filter((i) => (i.tier ?? 1) >= g.tier).length, g.count), target: g.count };
     case 'sound': return { current: Math.min(Math.floor(soundSystem(state)), g.value), target: g.value };
     case 'heists': return { current: Math.min(state.stats.heists, g.count), target: g.count };

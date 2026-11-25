@@ -92,10 +92,10 @@ export interface GuestEvent {
 export type QueueNote = { kind: 'full' | 'impatient' | 'vip-left'; name?: string } | { kind: 'review'; stars: number; text: string; tags: Tag[]; who: string };
 
 /** Cost of checking a VIP's story (the UI charges it). */
-export const VIP_CHECK_COST = 30;
-export const VIP_REAL_COVER = 150;
-export const VIP_FRAUD_LOSS = 100;
-export const VIP_DRINK = 60;
+export const VIP_CHECK_COST = 60;
+export const VIP_REAL_COVER = 300;
+export const VIP_FRAUD_LOSS = 200;
+export const VIP_DRINK = 120;
 export const MAX_QUEUE = 10;
 /** The sidewalk in front of the lot (world z): people come walking along it and go back along it. */
 export const SIDEWALK_Y = PARCEL.h - YARD - 1.3;
@@ -104,8 +104,8 @@ const SIDEWALK_ENDS = [-44, 78];
 const SPACING = 1.05;
 const ADMIT_EVERY = 2.5;
 
-export const COVER = 5;
-export const DRINK_PRICE = 25;
+export const COVER = 10;
+export const DRINK_PRICE = 50;
 const SPEED = 1.15; // tiles per second
 /**
  * The most people a club can hold, by the club's level and its building: it grows with the level (a famous club is a bigger crowd)

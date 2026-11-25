@@ -14,7 +14,8 @@ export function openDecor(ctx: Ctx): void {
   const coins = el('div', 'pill coins');
   modal.headExtra.append(coins);
   const body = el('div', 'decor-groups');
-  modal.body.append(el('p', 'facade-intro', 'El local empieza pelado, como un sótano. Cada acabado que compras se pone al instante y suma lujo. Puedes volver a uno anterior cuando quieras.'), body);
+  const count = el('p', 'facade-intro');
+  modal.body.append(count, el('p', 'facade-intro', 'El local empieza pelado, como un sótano. Cada acabado que compras se pone al instante y suma lujo. Puedes volver a uno anterior cuando quieras.'), body);
 
   const card = (o: DecorOption) => {
     const s = club.state;
@@ -43,6 +44,7 @@ export function openDecor(ctx: Ctx): void {
 
   const draw = () => {
     body.replaceChildren();
+    count.textContent = `Acabados: ${club.state.decor.owned.length} de ${DECOR.length} (5 básicos incluidos).`;
     for (const g of GROUPS) {
       const sec = el('section', 'decor-group');
       sec.append(el('h3', '', g.label), el('p', 'decor-hint', g.hint));

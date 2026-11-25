@@ -34,7 +34,7 @@ const BASE_STAFF: StaffDef[] = [
 export const STAFF: StaffDef[] = BASE_STAFF.map((d) => ({ ...d, hire: d.hire * PRICE_SCALE }));
 
 export const STAFF_BY_ROLE = new Map(STAFF.map((s) => [s.role, s]));
-export const DANCE_TIP = 1;
+export const DANCE_TIP = 2;
 export const WAGE_EVERY = 30;
 
 export type StaffCount = Record<Role, number>;

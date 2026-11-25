@@ -24,6 +24,17 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25o',
+    date: '25 de noviembre de 2026',
+    title: 'Ganas el doble y misiones arregladas',
+    intro: 'Tus invitados gastan mucho más, así que tu club rinde casi el doble.',
+    entries: [
+      { kind: 'icon', ref: 'coin', title: 'Entrada y tragos al doble', text: 'La entrada pasa de 5 a 10 monedas y el trago de 25 a 50. Los bailes también dejan el doble de propina.', where: 'Tu club abierto' },
+      { kind: 'icon', ref: 'missions', title: 'Misiones arregladas', text: '«Todo el lujo» ahora cuenta los 20 acabados que ves en Decoración (los 5 básicos también cuentan), y la ventana te dice cuántos llevas. Se quitaron las misiones de subir canciones: puedes seguir poniendo tu música cuando quieras.', where: 'Misiones › Oficina › Decorar' },
+      { kind: 'icon', ref: 'star', title: 'Los famosos pagan el doble', text: 'Un famoso de verdad deja 300 monedas de entrada y 120 por trago. Investigarlo ahora cuesta 60, y un farsante te cuesta 200.', where: 'La puerta del club' },
+    ],
+  },
+  {
     id: '2026-11-25n',
     date: '25 de noviembre de 2026',
     title: 'Cuenta con passkey y tu club en todos tus dispositivos',
