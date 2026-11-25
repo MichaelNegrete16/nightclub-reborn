@@ -236,20 +236,21 @@ function slotMaterial(colors: Float32Array, outlined: boolean): THREE.MeshToonMa
   m.onBeforeCompile = (shader) => {
     shader.uniforms.slotColors = { value: colors };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', 'attribute float slotId;\nvarying float vSlot;\n#include <common>')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSlot = slotId;');
+      .replace('#include <common>', `attribute float slotId;\nuniform vec3 slotColors[ ${MAX_SLOTS} ];\nvarying vec3 vSlotColor;\n#include <common>`)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSlotColor = slotColors[ int( slotId + 0.5 ) ];');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `uniform vec3 slotColors[ ${MAX_SLOTS} ];\nvarying float vSlot;\n#include <common>`)
-      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( slotColors[ int( vSlot + 0.5 ) ], opacity );');
+      .replace('#include <common>', 'varying vec3 vSlotColor;\n#include <common>')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( vSlotColor, opacity );');
   };
-  m.customProgramCacheKey = () => 'slots';
+  m.customProgramCacheKey = () => 'slots2';
   return m;
 }
 
 const paintColor = new THREE.Color();
+const SINGLE_MESH = new URLSearchParams(globalThis.location?.search ?? '').get('personajes') === 'malla';
 
 export function instantiateFixed(gltf: GLTF, cfg: CharacterConfig): Prepared {
-  const rig = rigOf(gltf);
+  const rig = SINGLE_MESH ? rigOf(gltf) : null;
   const combo = rig && comboOf(rig, cfg);
   if (!rig || !combo) {
     const plain = instantiate(gltf);

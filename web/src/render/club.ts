@@ -1302,7 +1302,10 @@ export class ClubView {
       if (def.layer === 'floor') this.floorTop.set(it.x + it.y * 64, tier === 4 ? 0.098 : 0.09);
       g.traverse((o) => {
         if (o.userData.spin !== undefined) this.spinners.push(o);
-        if (typeof o.userData.tick === 'function') this.ticks.push(o.userData.tick as PropTick);
+        if (typeof o.userData.tick === 'function') {
+          this.ticks.push(o.userData.tick as PropTick);
+          g.userData.live = true;
+        }
         const m = o as THREE.Mesh;
         if (m.isMesh && m.userData.pulse) this.pulse.push(m.material as THREE.MeshToonMaterial);
       });
