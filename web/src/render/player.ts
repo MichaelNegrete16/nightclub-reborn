@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type { AnimId, CharacterConfig, Sex } from '../core/character';
-import { applyConfig, instantiate, loadModel, playClip, type Prepared } from './avatar';
+import { applyConfig, comboKey, instantiateFixed, loadModel, playClip, type Prepared } from './avatar';
 import { isEmote } from '../core/emotes';
 
 const WALK_SPEED_UP = 1.9; // the walk cycle was authored slower than the player moves
@@ -20,6 +20,8 @@ export class PlayerActor {
   stance: AnimId | null = null;
   /** how fast the dances run (the music's BPM over the 100 they were drawn at) */
   tempo = 1;
+  floorAt: ((x: number, z: number) => number) | null = null;
+  private lift = 0;
 
   private models: Partial<Record<Sex, GLTF>> = {};
   private prepared: Prepared | null = null;
@@ -31,15 +33,19 @@ export class PlayerActor {
 
   async setLook(cfg: CharacterConfig): Promise<void> {
     this.look = cfg;
-    if (this.sex !== cfg.sex) {
+    if (this.sex !== cfg.sex || (this.prepared?.combo !== undefined && this.prepared.combo !== comboKey(cfg))) {
       this.models[cfg.sex] ??= await loadModel(cfg.sex);
       if (this.look !== cfg) return; // a newer look arrived while loading
-      if (this.prepared) this.group.remove(this.prepared.root);
-      this.prepared = instantiate(this.models[cfg.sex]!);
+      if (this.prepared) {
+        this.group.remove(this.prepared.root);
+        this.prepared.release?.();
+      }
+      this.prepared = instantiateFixed(this.models[cfg.sex]!, cfg);
       this.prepared.root.scale.setScalar(this.size);
       this.group.add(this.prepared.root);
       this.sex = cfg.sex;
       this.anim = null;
+      this.action = null;
     }
     if (this.prepared) applyConfig(this.prepared, cfg);
   }
@@ -86,7 +92,8 @@ export class PlayerActor {
         left = 0;
       }
     }
-    this.group.position.set(this.x, 0, this.z);
+    this.lift += ((this.floorAt ? this.floorAt(this.x, this.z) : 0) - this.lift) * Math.min(1, dt * 14);
+    this.group.position.set(this.x, this.lift, this.z);
     this.group.rotation.y = this.yaw;
     this.play(this.path.length ? 'walk' : this.stance ?? 'idle');
     if (this.action && this.anim && isEmote(this.anim)) this.action.timeScale = this.tempo;

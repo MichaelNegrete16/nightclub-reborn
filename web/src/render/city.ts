@@ -160,10 +160,13 @@ export function buildCity(neighbors: Neighbor[], home: Cell = { i: 0, j: 0 }, ra
   const z0 = lotOrigin({ i: -RANGE, j: -RANGE }).z;
   const spanW = CELL.w * (2 * RANGE + 1);
   const spanH = CELL.h * (2 * RANGE + 1);
+  const slab = () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const lots: THREE.Matrix4[] = [];
   for (const c of cells) {
     const o = lotOrigin(c);
-    if (c.i !== 0 || c.j !== 0) flat(LOT.w, LOT.h, o.x + LOT.w / 2, o.z + LOT.h / 2, -0.1, pavement);
+    if (c.i !== 0 || c.j !== 0) lots.push(at(o.x + LOT.w / 2, -0.1, o.z + LOT.h / 2, LOT.w, 1, LOT.h));
   }
+  g.add(instanced(slab(), pavement, lots));
   for (let j = -RANGE; j <= RANGE; j++) flat(spanW, STREET, x0 + spanW / 2, lotOrigin({ i: 0, j }).z + LOT.h + STREET / 2, -0.095, asphalt);
   for (let i = -RANGE; i <= RANGE; i++) flat(STREET, spanH, lotOrigin({ i, j: 0 }).x + LOT.w + STREET / 2, z0 + spanH / 2, -0.095, asphalt);
 
@@ -171,16 +174,16 @@ export function buildCity(neighbors: Neighbor[], home: Cell = { i: 0, j: 0 }, ra
   const walkMat = std(0xc9ccd8);
   const curbMat = std(0xe2e4ec);
   const SW = 2.6;
+  const walks: THREE.Matrix4[] = [];
+  const curbs: THREE.Matrix4[] = [];
   for (const c of cells) {
     const o = lotOrigin(c);
-    flat(LOT.w, SW, o.x + LOT.w / 2, o.z + LOT.h - SW / 2, -0.045, walkMat);
-    flat(SW, LOT.h, o.x + LOT.w - SW / 2, o.z + LOT.h / 2, -0.045, walkMat);
-    for (const [w, d, x, z] of [[LOT.w, 0.22, o.x + LOT.w / 2, o.z + LOT.h - 0.11], [0.22, LOT.h, o.x + LOT.w - 0.11, o.z + LOT.h / 2]] as const) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), curbMat);
-      curb.position.set(x, -0.02, z);
-      g.add(curb);
-    }
+    walks.push(at(o.x + LOT.w / 2, -0.045, o.z + LOT.h - SW / 2, LOT.w, 1, SW));
+    walks.push(at(o.x + LOT.w - SW / 2, -0.045, o.z + LOT.h / 2, SW, 1, LOT.h));
+    for (const [w, d, x, z] of [[LOT.w, 0.22, o.x + LOT.w / 2, o.z + LOT.h - 0.11], [0.22, LOT.h, o.x + LOT.w - 0.11, o.z + LOT.h / 2]] as const) curbs.push(at(x, -0.02, z, w, 1, d));
   }
+  g.add(instanced(slab(), walkMat, walks));
+  g.add(instanced(new THREE.BoxGeometry(1, 0.1, 1), curbMat, curbs));
 
   const line = std(0xe8e4d0);
   const dashes: THREE.Matrix4[] = [];

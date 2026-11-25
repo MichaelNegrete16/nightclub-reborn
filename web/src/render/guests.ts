@@ -5,7 +5,7 @@ import type { Guest, Mode } from '../core/guests';
 import type { Genre } from '../core/music';
 import { DANCE_BPM, crowdDances } from '../core/emotes';
 import { canvasTexture } from './comic';
-import { applyConfig, instantiate, loadModel, playClip, type Prepared } from './avatar';
+import { instantiateFixed, loadModel, playClip, type Prepared } from './avatar';
 import { LOOP_SECONDS, findBone } from './dances';
 
 const ANIM: Record<Mode, AnimId> = { walk: 'walk', dance: 'dance', drink: 'idle', lounge: 'idle', idle: 'idle' };
@@ -27,6 +27,7 @@ interface Actor {
   /** the leg bones with their standing orientation, to fold them when the guest sits */
   legs: Array<{ thigh: THREE.Object3D; shin: THREE.Object3D; thighRest: THREE.Quaternion; shinRest: THREE.Quaternion }>;
   seated: boolean;
+  lift: number;
 }
 
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -114,6 +115,7 @@ export class GuestCrowd {
   genre: Genre | null = null;
   bpm = DANCE_BPM;
   private frame = 0;
+  floorAt: ((x: number, z: number) => number) | null = null;
 
   async init(): Promise<void> {
     const [male, female] = await Promise.all([loadModel('male'), loadModel('female')]);
@@ -142,7 +144,10 @@ export class GuestCrowd {
         a = this.spawn(g);
         this.actors.set(g.id, a);
       }
-      a.holder.position.set(g.x, g.sit !== undefined && (g.mode === 'lounge' || g.mode === 'drink') ? g.sit : 0, g.y);
+      const onSeat = g.sit !== undefined && (g.mode === 'lounge' || g.mode === 'drink');
+      const floor = this.floorAt ? this.floorAt(g.x, g.y) : 0;
+      a.lift += (floor - a.lift) * Math.min(1, dt * 14);
+      a.holder.position.set(g.x, onSeat ? g.sit! : a.lift, g.y);
       this.updateBadge(a, g);
       this.updateEmote(a, g, time);
       a.holder.visible = !show || show(g);
@@ -190,24 +195,27 @@ export class GuestCrowd {
       if (alive.has(id)) continue;
       this.group.remove(a.holder);
       a.prepared.mats.forEach((m) => m.dispose());
+      a.prepared.release?.();
       this.actors.delete(id);
     }
   }
 
   clear(): void {
-    for (const a of this.actors.values()) this.group.remove(a.holder);
+    for (const a of this.actors.values()) {
+      this.group.remove(a.holder);
+      a.prepared.release?.();
+    }
     this.actors.clear();
   }
 
   private spawn(g: Guest): Actor {
     const sex: Sex = g.id % 2 === 0 ? 'female' : 'male';
-    const prepared = instantiate(this.models[sex]!);
-    applyConfig(prepared, randomConfig(sex));
+    const prepared = instantiateFixed(this.models[sex]!, randomConfig(sex));
     const holder = new THREE.Group();
     prepared.root.scale.setScalar(SCALE);
     holder.add(prepared.root);
     this.group.add(holder);
-    return { prepared, holder, action: null, mode: null, clip: null, yaw: Math.atan2(g.dirX, g.dirY), badge: null, badgeState: '', emote: null, emoteKind: '', legs: legsOf(prepared.root), seated: false };
+    return { prepared, holder, action: null, mode: null, clip: null, yaw: Math.atan2(g.dirX, g.dirY), badge: null, badgeState: '', emote: null, emoteKind: '', legs: legsOf(prepared.root), seated: false, lift: this.floorAt ? this.floorAt(g.x, g.y) : 0 };
   }
 
   /** The bubble over a guest's head when they love, like, dislike or are bored by the music. */

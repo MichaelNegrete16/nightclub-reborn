@@ -13,29 +13,40 @@ const WOOD = 0xc07a3a;
 const WOOD_DARK = 0x8a4f26;
 
 type O = ToonOpts;
+
+const GEOS = new Map<string, THREE.BufferGeometry>();
+function geo(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
+  let g = GEOS.get(key);
+  if (!g) {
+    g = make();
+    g.userData.shared = true;
+    GEOS.set(key, g);
+  }
+  return g;
+}
 const glow = (c: number, i = 1.2): O => ({ emissive: c, emissiveIntensity: i, outline: false });
 
 /** Rounded box (corners softened), sitting on `y`, centred on x/z. */
 function box(w: number, h: number, d: number, color: number | string, x: number, y: number, z: number, o?: O, r = Math.min(0.045, w / 3, h / 3, d / 3)): THREE.Mesh {
-  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.max(0.004, r)), toon(color, o));
+  const m = new THREE.Mesh(geo(`b|${w}|${h}|${d}|${r}`, () => new RoundedBoxGeometry(w, h, d, 3, Math.max(0.004, r))), toon(color, o));
   m.position.set(x, y + h / 2, z);
   return m;
 }
 
 function cyl(rTop: number, rBottom: number, h: number, color: number | string, x: number, y: number, z: number, seg = 16, o?: O): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, h, seg), toon(color, o));
+  const m = new THREE.Mesh(geo(`c|${rTop}|${rBottom}|${h}|${seg}`, () => new THREE.CylinderGeometry(rTop, rBottom, h, seg)), toon(color, o));
   m.position.set(x, y + h / 2, z);
   return m;
 }
 
 function ball(r: number, color: number | string, x: number, y: number, z: number, o?: O & { detail?: number; flat?: boolean }): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, o?.detail ?? 2), toon(color, o));
+  const m = new THREE.Mesh(geo(`i|${r}|${o?.detail ?? 2}`, () => new THREE.IcosahedronGeometry(r, o?.detail ?? 2)), toon(color, o));
   m.position.set(x, y, z);
   return m;
 }
 
 function torus(r: number, tube: number, color: number | string, x: number, y: number, z: number, o?: O, rotX = Math.PI / 2): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 8, 24), toon(color, o));
+  const m = new THREE.Mesh(geo(`t|${r}|${tube}`, () => new THREE.TorusGeometry(r, tube, 8, 24)), toon(color, o));
   m.position.set(x, y, z);
   m.rotation.x = rotX;
   return m;

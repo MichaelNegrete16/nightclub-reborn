@@ -48,6 +48,7 @@ import { Environment } from './environment';
 import { neon } from './comic';
 import { buildProp } from './props';
 import { toon } from './toon';
+import { mergeStatic } from './batch';
 
 const ORIGIN = { x: YARD, z: YARD }; // the building sits this many tiles inside the parcel
 /** where the player may walk in the street: the lot and the roads around it */
@@ -120,6 +121,10 @@ export class ClubView {
   /** what to do when the player reaches the end of the current walk */
   private arrival: 'enter' | 'exit' | null = null;
   private items = new THREE.Group();
+  private itemsBatch = new THREE.Group();
+  private built = new Map<string, { sig: string; group: THREE.Group }>();
+  private floorTop = new Map<number, number>();
+  private floorHeight = (x: number, z: number): number => this.floorTop.get(Math.floor(x) + Math.floor(z) * 64) ?? 0;
   private grid!: THREE.LineSegments;
   private signOpen: THREE.Object3D | null = null;
   private signClosed: THREE.Object3D | null = null;
@@ -162,6 +167,7 @@ export class ClubView {
 
   constructor(private canvas: HTMLCanvasElement, private hooks: ClubHooks) {
     const s = this.scene;
+    s.traverse = (fn) => walkVisible(s, fn);
     const hemi = new THREE.HemisphereLight(0x9aa8ff, 0x2a1a4a, 1.5);
     const key = new THREE.DirectionalLight(0xffffff, 2.2);
     key.position.set(10, 22, 14);
@@ -186,7 +192,7 @@ export class ClubView {
       }, 3500);
     };
     s.add(this.fx.group, this.remote.group, this.ambient.group);
-    s.add(this.city.group, this.room, this.facade, this.items, this.crowd.group, this.player.group, this.staffGroup, this.lane);
+    s.add(this.city.group, this.room, this.facade, this.items, this.itemsBatch, this.crowd.group, this.player.group, this.staffGroup, this.lane);
     // sky, sun/moon, fog and light follow the hour and the weather; the city and the club's neon follow the night
     this.env = new Environment(s, { hemi, sun: key });
     this.env.onNight = (night) => {
@@ -227,6 +233,8 @@ export class ClubView {
     canvas.addEventListener('pointerleave', () => this.setHover(null));
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    this.crowd.floorAt = this.floorHeight;
+    this.player.floorAt = this.floorHeight;
     this.rebuildRoom();
     this.rebuildItems();
     this.resetView();
@@ -607,10 +615,10 @@ export class ClubView {
     const e = 1 - (1 - t) ** 3; // fast at first, then settles
     const y = Math.max(0.04, e + (t > 0.7 ? Math.sin((t - 0.7) * Math.PI * 3.3) * 0.03 : 0)); // a little bounce at the end
     this.interior.scale.y = y;
-    this.items.scale.y = y;
+    this.items.scale.y = this.itemsBatch.scale.y = y;
     this.facade.scale.y = y;
     if (this.buildT >= 1) {
-      this.interior.scale.y = this.items.scale.y = this.facade.scale.y = 1;
+      this.interior.scale.y = this.items.scale.y = this.itemsBatch.scale.y = this.facade.scale.y = 1;
       this.hooks.onToast(`¡Obra terminada! Ahora tienes un ${phaseOf(this.state).name}.`, 'ok');
     }
   }
@@ -1242,26 +1250,48 @@ export class ClubView {
   }
 
   private rebuildItems(): void {
-    disposeChildren(this.items);
     this.pulse = [];
     this.spinners = [];
     this.fx.clearSources();
+    this.floorTop.clear();
+    const before = this.built;
+    this.built = new Map();
+    for (const child of [...this.items.children]) this.items.remove(child);
     for (const it of this.state.items) {
       const def = BY_ID.get(it.id);
       if (!def) continue;
-      const g = buildProp(def.id, def.w, def.d, tierOfItem(it));
-      g.userData.uid = it.uid;
-      this.place(g, def, it.x, it.y, it.rot);
+      const tier = tierOfItem(it);
+      const live = def.id === 'speaker' || BOOTH_IDS.includes(def.id);
+      const sig = `${def.id}|${it.x}|${it.y}|${it.rot}|${tier}`;
+      const kept = live ? undefined : before.get(it.uid);
+      let g: THREE.Group;
+      if (kept && kept.sig === sig) {
+        g = kept.group;
+        before.delete(it.uid);
+      } else {
+        g = buildProp(def.id, def.w, def.d, tier);
+        g.userData.uid = it.uid;
+        this.place(g, def, it.x, it.y, it.rot);
+      }
+      this.built.set(it.uid, { sig, group: g });
+      if (def.layer === 'floor') this.floorTop.set(it.x + it.y * 64, tier === 4 ? 0.098 : 0.09);
       g.traverse((o) => {
         if (o.userData.spin !== undefined) this.spinners.push(o);
         const m = o as THREE.Mesh;
         if (m.isMesh && m.userData.pulse) this.pulse.push(m.material as THREE.MeshToonMaterial);
       });
       this.items.add(g);
-      if (def.id === 'speaker' || BOOTH_IDS.includes(def.id)) this.fx.addSource(g, BOOTH_IDS.includes(def.id) ? 'booth' : 'speaker');
+      if (live) {
+        g.userData.live = true;
+        this.fx.addSource(g, BOOTH_IDS.includes(def.id) ? 'booth' : 'speaker');
+      }
     }
+    const gone = new THREE.Group();
+    for (const b of before.values()) gone.add(b.group);
+    disposeChildren(gone);
     // Picking runs between frames: refresh world matrices now so a click right after an edit hits the new layout.
     this.items.updateMatrixWorld(true);
+    mergeStatic(this.items, this.itemsBatch);
     this.rebuildStaff();
   }
 
@@ -1580,7 +1610,7 @@ export class ClubView {
       this.scene.remove(this.visitGroup);
       this.visitGroup.traverse((o) => {
         const m = o as THREE.Mesh;
-        if (m.isMesh) m.geometry.dispose();
+        if (m.isMesh && !m.geometry.userData.shared) m.geometry.dispose();
       });
       this.visitGroup = null;
     }
@@ -1708,7 +1738,7 @@ export class ClubView {
   private applyMode(): void {
     const inside = this.mode === 'inside';
     this.interior.visible = inside;
-    this.items.visible = inside;
+    this.items.visible = this.itemsBatch.visible = inside;
     this.facade.visible = !inside;
     if (!inside) this.highlight.visible = false;
     else this.refreshHighlight();
@@ -2006,12 +2036,18 @@ function rectLine(x: number, z: number, w: number, h: number, color: number, opa
   return new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
 }
 
+function walkVisible(o: THREE.Object3D, fn: (o: THREE.Object3D) => unknown): void {
+  if (!o.visible) return;
+  fn(o);
+  for (const c of o.children) walkVisible(c, fn);
+}
+
 function disposeChildren(group: THREE.Group): void {
   for (const child of [...group.children]) {
     group.remove(child);
     child.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.geometry) m.geometry.dispose();
+      if (m.geometry && !m.geometry.userData.shared) m.geometry.dispose();
       const mat = m.material as THREE.Material | THREE.Material[] | undefined;
       if (Array.isArray(mat)) mat.forEach((x) => x !== GHOST_OK && x !== GHOST_BAD && !x.userData.shared && x.dispose());
       else if (mat && mat !== GHOST_OK && mat !== GHOST_BAD && !mat.userData.shared) mat.dispose();
