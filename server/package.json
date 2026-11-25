@@ -1,0 +1,15 @@
+{
+  "name": "nightclub-reborn-server",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Multiplayer server for the city: hands out lots and tells every player who lives nearby.",
+  "scripts": {
+    "start": "node --experimental-strip-types index.mjs",
+    "test": "node --experimental-strip-types test.mjs",
+    "load": "node --experimental-strip-types loadtest.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

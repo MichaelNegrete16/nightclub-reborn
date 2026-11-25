@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nightclub Reborn · Propuesta de rediseño de la interfaz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #150d26;
+  --night: #1d2750;
+  --night-2: #27346a;
+  --night-3: #121a3b;
+  --wall: #8f96b4;
+  --red: #d6314a;
+  --gold: #f5b91d;
+  --mint: #3ddc97;
+  --pink: #ff4fa3;
+  --sky: #5ec8ff;
+  --text: #f4f1ff;
+  --muted: #a9b0d6;
+  --r: 16px;
+  --font-display: 'Bungee', 'Arial Black', Impact, sans-serif;
+  --font-body: 'Nunito', system-ui, 'Segoe UI', sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #0b0716; color: var(--text); font-family: var(--font-body); font-weight: 700; font-size: 15px; line-height: 1.35; }
+button { font: inherit; color: inherit; cursor: pointer; }
+h1, h2, h3, h4 { margin: 0; font-weight: 400; font-family: var(--font-display); letter-spacing: .01em; }
+p { margin: 0; }
+svg.i { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- the sheet itself (not part of the game) ---------- */
+.sheet-nav { position: sticky; top: 0; z-index: 50; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 18px; background: #0b0716ee; border-bottom: 3px solid var(--ink); backdrop-filter: blur(6px); }
+.sheet-nav b { font-family: var(--font-display); font-weight: 400; margin-right: 10px; color: var(--gold); }
+.sheet-nav a { color: var(--text); text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 2px solid #3a2d5c; font-size: 13px; }
+.sheet-nav a:hover { border-color: var(--gold); }
+.wrap { max-width: 1500px; margin: 0 auto; padding: 28px 22px 80px; }
+.sec-title { margin: 56px 0 6px; font-size: 26px; color: var(--gold); }
+.sec-note { color: var(--muted); max-width: 70ch; margin-bottom: 18px; font-weight: 500; }
+.intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: end; margin: 8px 0 12px; }
+.intro h1 { font-size: clamp(30px, 4.4vw, 60px); line-height: 1.02; }
+.intro p { color: var(--muted); font-weight: 500; font-size: 16px; max-width: 60ch; }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.sw { width: 86px; border-radius: 12px; border: 3px solid var(--ink); overflow: hidden; background: #fff1; box-shadow: 0 3px 0 var(--ink); }
+.sw i { display: block; height: 44px; }
+.sw span { display: block; font-size: 11px; padding: 4px 6px; text-align: center; background: var(--night-3); }
+.stage { position: relative; border-radius: 22px; border: 3px solid var(--ink); box-shadow: 0 6px 0 var(--ink); overflow: hidden; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 26px; align-items: start; }
+.cap { margin: 10px 4px 0; font-size: 13px; color: var(--muted); font-weight: 500; }
+
+/* ---------- the design system ---------- */
+.panel { background: var(--night); border: 3px solid var(--ink); border-radius: var(--r); box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 #ffffff22; }
+.panel.deep { background: var(--night-3); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 12px; border: 3px solid var(--ink); background: var(--night-2); box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 #ffffff33; font-weight: 800; transition: transform .07s, box-shadow .07s; }
+.btn:hover { filter: brightness(1.12); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 #ffffff33; }
+.btn.go { background: var(--mint); color: #0b2b1c; }
+.btn.hot { background: var(--red); }
+.btn.gold { background: var(--gold); color: #3a2600; }
+.btn.ghost { background: transparent; box-shadow: none; border-color: #ffffff30; }
+.btn.small { padding: 6px 11px; font-size: 13px; border-radius: 10px; border-width: 2px; box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 #ffffff33; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.price { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); font-weight: 400; }
+.coin { width: 1.05em; height: 1.05em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 55%, #b9810a); border: 2px solid var(--ink); display: inline-block; flex: none; }
+.gem { width: 1em; height: 1em; background: var(--sky); border: 2px solid var(--ink); transform: rotate(45deg) scale(.82); display: inline-block; border-radius: 3px; flex: none; }
+
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px; border-radius: 999px; background: var(--night); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 #ffffff22; white-space: nowrap; font-weight: 800; }
+.pill .num { font-family: var(--font-display); font-weight: 400; font-size: 15px; }
+.pill small { color: var(--muted); font-weight: 700; }
+.pill.red { background: var(--red); }
+.pill.warm { background: #4a2a12; }
+.pill.vip { background: linear-gradient(180deg, #ff74b9, var(--pink)); color: #3b0420; }
+
+.bar { height: 14px; border-radius: 99px; background: var(--ink); border: 3px solid var(--ink); overflow: hidden; position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--mint), var(--gold)); border-radius: 99px; }
+.bar.heat > i { background: linear-gradient(90deg, var(--gold), var(--red)); }
+
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px; border-radius: 8px; background: var(--ink); color: var(--text); font-weight: 800; }
+.tag.mint { background: var(--mint); color: #0b2b1c; }
+.tag.gold { background: var(--gold); color: #3a2600; }
+.tag.red { background: var(--red); }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { padding: 7px 13px; border-radius: 10px 10px 0 0; border: 3px solid var(--ink); border-bottom: 0; background: var(--night-3); font-weight: 800; color: var(--muted); }
+.tab.on { background: var(--night-2); color: var(--text); box-shadow: inset 0 3px 0 var(--gold); }
+
+.toggle { width: 50px; height: 28px; border-radius: 99px; border: 3px solid var(--ink); background: var(--night-3); position: relative; }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--wall); border: 2px solid var(--ink); transition: left .12s; }
+.toggle.on { background: var(--mint); }
+.toggle.on::after { left: 24px; background: #fff; }
+.slider { height: 10px; border-radius: 99px; background: var(--ink); position: relative; width: 100%; }
+.slider i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); border-radius: 99px; }
+.slider b { position: absolute; top: -6px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); transform: translateX(-50%); }
+
+/* the one memorable thing: the marquee title, with its row of bulbs */
+.marquee { position: relative; padding: 14px 18px 12px; background: var(--red); border-bottom: 3px solid var(--ink); border-radius: 13px 13px 0 0; display: flex; align-items: center; gap: 12px; }
+.marquee::before { content: ''; position: absolute; left: 12px; right: 12px; top: 4px; height: 6px; background: radial-gradient(circle, #fff6c2 0 2.6px, transparent 3.2px) 0 0 / 18px 6px repeat-x; filter: drop-shadow(0 0 4px #ffd24a); }
+.marquee h3 { font-size: 20px; margin-top: 6px; text-shadow: 0 3px 0 var(--ink); }
+.marquee .x { margin-left: auto; margin-top: 6px; }
+.marquee.blue { background: var(--night-2); }
+.marquee.gold { background: var(--gold); color: #3a2600; }
+.marquee.gold h3 { text-shadow: 0 2px 0 #ffffff55; }
+.marquee.dark { background: #2a0f2e; }
+
+.modal { width: 100%; }
+.modal .body { padding: 16px; display: grid; gap: 12px; }
+.modal-head-extra { display: flex; gap: 8px; margin-left: auto; margin-top: 6px; align-items: center; }
+.row { display: flex; align-items: center; gap: 12px; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); font-weight: 600; }
+.card { background: var(--night-3); border: 3px solid var(--ink); border-radius: 14px; padding: 12px; display: flex; gap: 12px; align-items: center; box-shadow: inset 0 2px 0 #ffffff10; }
+.card h4 { font-size: 15px; }
+.thumb { width: 58px; height: 58px; border-radius: 12px; border: 3px solid var(--ink); display: grid; place-items: center; flex: none; background: var(--night-2); font-size: 26px; }
+.sticker { transform: rotate(-3deg); }
+
+/* ---------- the HUD over the game ---------- */
+.scene { position: relative; min-height: 760px; background:
+  radial-gradient(900px 500px at 50% 70%, #2b3a7a55, transparent 70%),
+  repeating-linear-gradient(0deg, #2a3260 0 2px, transparent 2px 70px),
+  repeating-linear-gradient(90deg, #2a3260 0 2px, transparent 2px 70px), #1a2146; }
+.scene .block { position: absolute; border: 3px solid var(--ink); border-radius: 10px; box-shadow: 0 5px 0 var(--ink); }
+.hud-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 10px; align-items: flex-start; }
+.me { display: flex; gap: 10px; align-items: center; padding: 7px 16px 9px 7px; min-width: 250px; }
+.lvl { width: 54px; height: 54px; border-radius: 50%; background: var(--gold); color: #3a2600; border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); display: grid; place-items: center; font-family: var(--font-display); font-size: 24px; flex: none; }
+.me .who { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.me .who b { font-family: var(--font-display); font-weight: 400; font-size: 16px; }
+.me .who small { color: var(--muted); font-weight: 700; font-size: 12px; margin-top: -2px; }
+.hud-mid { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; flex: 1; padding-top: 4px; }
+.hud-right { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
+.round { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--ink); background: var(--night); box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 #ffffff22; display: grid; place-items: center; font-size: 20px; }
+.mission { position: absolute; top: 96px; left: 12px; width: 330px; padding: 10px 12px 12px; display: grid; gap: 7px; }
+.mission .top { display: flex; align-items: center; gap: 8px; }
+.mission .more { margin-left: auto; font-size: 12px; color: var(--muted); }
+.mission h4 { font-size: 15px; }
+.mission p { font-size: 13px; color: #d8dcf6; font-weight: 600; }
+.toasts { position: absolute; top: 96px; right: 12px; display: grid; gap: 8px; width: 330px; }
+.toast { padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+.toast .ic { width: 34px; height: 34px; border-radius: 10px; border: 3px solid var(--ink); display: grid; place-items: center; flex: none; }
+.chat { position: absolute; left: 12px; bottom: 14px; width: 340px; display: grid; gap: 8px; }
+.chat .log { padding: 8px 10px; font-size: 13px; display: grid; gap: 3px; font-weight: 600; }
+.chat .log b { color: var(--gold); }
+.chat .in { display: flex; gap: 8px; }
+.chat input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 12px; border: 3px solid var(--ink); background: var(--night-3); color: var(--text); font: inherit; font-weight: 700; }
+.minimap { position: absolute; right: 12px; bottom: 14px; padding: 8px; width: 170px; }
+.minimap .g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 6px; }
+.minimap .g i { aspect-ratio: 1; background: var(--night-3); border-radius: 3px; border: 1px solid #ffffff12; }
+.minimap .g i.me { background: var(--gold); box-shadow: 0 0 0 2px var(--ink); }
+.minimap .g i.on { background: var(--mint); }
+.minimap .g i.away { background: var(--wall); }
+.tools { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; }
+.dock { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px; padding: 8px; }
+.dock .d { display: grid; justify-items: center; gap: 3px; padding: 8px 12px 6px; min-width: 76px; border-radius: 12px; border: 3px solid transparent; font-size: 12px; font-weight: 800; color: var(--muted); position: relative; }
+.dock .d svg { font-size: 26px; color: var(--text); }
+.dock .d:hover { background: var(--night-2); border-color: var(--ink); }
+.dock .d.open { background: var(--mint); color: #0b2b1c; border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.dock .d.open svg { color: #0b2b1c; }
+.dock .d .dot { position: absolute; top: 2px; right: 8px; width: 13px; height: 13px; border-radius: 50%; background: var(--red); border: 3px solid var(--ink); }
+.ctx { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px 10px; align-items: center; }
+.tipcard { position: absolute; left: 360px; bottom: 112px; width: 330px; }
+
+/* the "te explico" card: how the game teaches as you go */
+.tip { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px 14px 12px 12px; position: relative; border-color: var(--ink); background: #2b2152; }
+.tip::before { content: ''; position: absolute; left: -3px; top: 14px; bottom: 14px; width: 8px; border-radius: 6px; background: var(--gold); border: 3px solid var(--ink); }
+.tip .mascot { width: 52px; height: 52px; border-radius: 14px; background: var(--gold); border: 3px solid var(--ink); display: grid; place-items: center; font-size: 26px; color: #3a2600; }
+.tip h4 { font-size: 15px; margin-bottom: 2px; }
+.tip p { font-size: 13.5px; font-weight: 600; color: #e1def8; }
+.tip .acts { display: flex; gap: 8px; margin-top: 9px; align-items: center; }
+.tip .acts .muted { margin-left: auto; font-size: 12px; }
+.pulse-ring { position: absolute; border-radius: 16px; border: 4px solid var(--gold); box-shadow: 0 0 0 4px #ffffff22, 0 0 24px #f5b91d99; pointer-events: none; animation: ring 1.6s ease-in-out infinite; }
+@keyframes ring { 50% { transform: scale(1.06); opacity: .65; } }
+@media (prefers-reduced-motion: reduce) { .pulse-ring { animation: none; } }
+
+/* ---------- modals and popups on the sheet ---------- */
+.shelf { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 28px; align-items: start; }
+.ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ladder .s { border: 3px solid var(--ink); border-radius: 10px; padding: 7px 4px; text-align: center; font-size: 11px; background: var(--night-3); font-weight: 800; color: var(--muted); }
+.ladder .s.have { background: var(--night-2); color: var(--text); }
+.ladder .s.next { background: var(--gold); color: #3a2600; }
+.ladder .s.lock { opacity: .5; }
+.shopgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.item { background: var(--night-3); border: 3px solid var(--ink); border-radius: 14px; padding: 10px; display: grid; gap: 8px; justify-items: center; text-align: center; }
+.item .thumb { width: 68px; height: 68px; }
+.item h4 { font-size: 13px; }
+.stat { display: grid; gap: 2px; background: var(--night-3); border: 3px solid var(--ink); border-radius: 12px; padding: 8px 12px; }
+.stat b { font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.levelup { text-align: center; }
+.levelup .big { font-family: var(--font-display); font-size: 74px; line-height: 1; color: var(--gold); text-shadow: 0 5px 0 var(--ink), 0 0 30px #f5b91d88; margin: 8px 0 4px; }
+.unl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+.unl .card { padding: 9px; }
+.rays { background: repeating-conic-gradient(from 0deg at 50% 38%, #f5b91d22 0 8deg, transparent 8deg 20deg); }
+.vipcard { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px; align-items: center; }
+.ticket { position: relative; background: var(--gold); color: #3a2600; border: 3px solid var(--ink); border-radius: 14px; padding: 10px 14px; display: grid; gap: 2px; box-shadow: 0 4px 0 var(--ink); }
+.ticket::before, .ticket::after { content: ''; position: absolute; top: 50%; width: 18px; height: 18px; margin-top: -9px; background: var(--night); border: 3px solid var(--ink); border-radius: 50%; }
+.ticket::before { left: -12px; } .ticket::after { right: -12px; }
+.dialog { display: grid; grid-template-columns: 110px 1fr; gap: 14px; padding: 14px; }
+.face { width: 110px; height: 110px; border-radius: 18px; border: 3px solid var(--ink); background: var(--pink); display: grid; place-items: center; font-size: 56px; box-shadow: 0 4px 0 var(--ink); }
+.dialog .name { display: inline-block; background: var(--gold); color: #3a2600; border: 3px solid var(--ink); border-radius: 9px; padding: 1px 10px; font-family: var(--font-display); font-size: 13px; margin-bottom: 6px; }
+.dialog p { font-size: 16px; font-weight: 700; line-height: 1.4; }
+.lockgame .barx { position: relative; height: 40px; border-radius: 12px; background: var(--ink); border: 3px solid var(--ink); overflow: hidden; }
+.lockgame .zone { position: absolute; left: 52%; width: 18%; top: 0; bottom: 0; background: var(--mint); }
+.lockgame .needle { position: absolute; left: 31%; top: -2px; bottom: -2px; width: 7px; background: #fff; border-radius: 4px; box-shadow: 0 0 10px #fff; }
+.pins { display: flex; gap: 8px; justify-content: center; }
+.pins i { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--ink); background: var(--night-3); display: block; }
+.pins i.ok { background: var(--mint); } .pins i.cur { background: var(--gold); }
+.notice { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px; align-items: center; }
+.siren { width: 56px; height: 56px; border-radius: 14px; border: 3px solid var(--ink); display: grid; place-items: center; background: linear-gradient(90deg, var(--red) 50%, var(--sky) 50%); font-size: 28px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.legend .panel { padding: 12px; display: grid; gap: 4px; }
+.legend h4 { font-size: 14px; color: var(--gold); }
+.legend p { font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.type { display: grid; gap: 6px; }
+.type .d { font-family: var(--font-display); font-size: 44px; line-height: 1; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 4px solid var(--sky); outline-offset: 2px; }
+@media (max-width: 900px) { .intro { grid-template-columns: 1fr; } .grid2, .shelf { grid-template-columns: 1fr; } .scene { min-height: 900px; } .hud-top { flex-wrap: wrap; } .mission, .toasts, .chat, .tipcard { position: static; width: auto; margin: 8px 12px; } .dock { position: static; transform: none; margin: 8px; overflow-x: auto; } .minimap, .tools, .ctx { display: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="door" viewBox="0 0 24 24"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18"/><circle cx="14.5" cy="12.5" r=".6"/></symbol>
+    <symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+    <symbol id="box" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+    <symbol id="flag" viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></symbol>
+    <symbol id="desk" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="street" viewBox="0 0 24 24"><path d="m9 3-4 18M15 3l4 18M12 5v2M12 11v2M12 17v2"/></symbol>
+    <symbol id="person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+    <symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3Z"/></symbol>
+    <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+    <symbol id="city" viewBox="0 0 24 24"><path d="M3 21V9l6-3v15M9 21V4l8 3v14M17 21v-9l4 2v7M3 21h18"/></symbol>
+    <symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.5A3.4 3.4 0 0 1 17 18H7Z"/></symbol>
+    <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+    <symbol id="undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></symbol>
+    <symbol id="redo" viewBox="0 0 24 24"><path d="m15 7 5 5-5 5M20 12H10a6 6 0 0 0 0 12"/></symbol>
+    <symbol id="aim" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+    <symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></symbol>
+    <symbol id="fire" viewBox="0 0 24 24"><path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.4 1 2 2 2 0-3-1-5 1-8Z"/></symbol>
+    <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v6c0 4.5 3 7.5 7.5 9 4.5-1.5 7.5-4.5 7.5-9V6L12 3Z"/></symbol>
+    <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+  </defs>
+</svg>
+
+<nav class="sheet-nav">
+  <b>NIGHTCLUB REBORN</b>
+  <a href="#sistema">Sistema</a><a href="#hud">Pantalla de juego</a><a href="#menus">Ventanas</a><a href="#popups">Avisos y popups</a><a href="#guia">Guía que enseña</a><a href="#asalto">Robos y policía</a>
+</nav>
+
+<div class="wrap">
+
+<header class="intro">
+  <div>
+    <h1>La interfaz como cartel de discoteca</h1>
+    <div class="swatches">
+      <div class="sw"><i style="background:#150d26"></i><span>Tinta</span></div>
+      <div class="sw"><i style="background:#1d2750"></i><span>Medianoche</span></div>
+      <div class="sw"><i style="background:#d6314a"></i><span>Rojo teatro</span></div>
+      <div class="sw"><i style="background:#f5b91d"></i><span>Dorado</span></div>
+      <div class="sw"><i style="background:#3ddc97"></i><span>Menta</span></div>
+      <div class="sw"><i style="background:#ff4fa3"></i><span>VIP</span></div>
+      <div class="sw"><i style="background:#8f96b4"></i><span>Concreto</span></div>
+    </div>
+  </div>
+  <p>Esta es una propuesta para revisar, no está aplicada al juego. Los colores salen de las fachadas del propio club (el gris cemento, el azul medianoche, el rojo teatro y el dorado). Todo lleva borde de tinta gruesa y sombra dura, igual que el contorno toon de los personajes. La marquesina con bombillas es lo único especial y se usa solo en los títulos de ventana. Dime qué te gusta y qué no antes de aplicarla.</p>
+</header>
+
+<!-- ======================================================= SYSTEM -->
+<h2 class="sec-title" id="sistema">Sistema</h2>
+<p class="sec-note">Los mismos botones, píldoras, barras y pestañas en todo el juego. Una sola regla: lo que se puede pulsar tiene sombra y se hunde al apretarlo; lo que solo informa va plano.</p>
+<div class="grid2">
+  <div class="panel" style="padding:16px; display:grid; gap:16px">
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn go"><svg class="i"><use href="#check"/></svg>Comprar <span class="price"><span class="coin"></span>1.200</span></button>
+      <button class="btn">Mejorar</button>
+      <button class="btn gold"><svg class="i"><use href="#star"/></svg>Reclamar</button>
+      <button class="btn hot">Despedir</button>
+      <button class="btn ghost">Cerrar</button>
+      <button class="btn" disabled>Sin monedas</button>
+      <button class="btn small">Pequeño</button>
+    </div>
+    <div class="row" style="flex-wrap:wrap">
+      <span class="pill"><span class="coin"></span><span class="num">22.032</span></span>
+      <span class="pill"><span class="gem"></span><span class="num">237</span></span>
+      <span class="pill vip"><svg class="i"><use href="#star"/></svg><span class="num">80</span><small style="color:#5a1038">ambiente</small></span>
+      <span class="pill red"><svg class="i"><use href="#fire"/></svg><span class="num">62</span> calor</span>
+      <span class="tag mint">Nuevo</span><span class="tag gold">Élite</span><span class="tag red">Clausurado</span><span class="tag">Nivel 12</span>
+    </div>
+    <div style="display:grid; gap:12px">
+      <div class="row"><span class="muted" style="width:92px">Experiencia</span><div class="bar grow"><i style="width:62%"></i></div><b>1.461 / 6.449</b></div>
+      <div class="row"><span class="muted" style="width:92px">Calor</span><div class="bar heat grow"><i style="width:48%"></i></div><b>48</b></div>
+      <div class="row"><span class="muted" style="width:92px">Volumen</span><div class="slider grow"><i style="width:64%"></i><b style="left:64%"></b></div></div>
+      <div class="row"><span class="muted" style="width:92px">Sonido</span><div class="toggle on"></div><span class="muted" style="width:92px; margin-left:18px">Efectos</span><div class="toggle"></div></div>
+    </div>
+    <div>
+      <div class="tabs"><span class="tab on">Barras</span><span class="tab">Asientos</span><span class="tab">Mesas</span><span class="tab">DJ y sonido</span><span class="tab">Seguridad</span></div>
+      <div class="panel deep" style="border-top-left-radius:0; padding:12px">Las pestañas llevan la franja dorada arriba cuando están activas.</div>
+    </div>
+  </div>
+  <div class="panel" style="padding:16px; display:grid; gap:14px">
+    <div class="type"><div class="d">Bungee</div><p class="muted">Para títulos, números y nombres de ventana: parece un letrero de neón y se lee de lejos. Se usa con moderación, nunca en párrafos.</p></div>
+    <div class="type"><p style="font-size:24px; font-weight:800">Nunito para todo el texto corrido</p><p class="muted" style="font-weight:600">Redondeada y clara, aguanta bien el tamaño pequeño en celular. Los textos de ayuda van en 13 a 15 px, con líneas de menos de 60 caracteres.</p></div>
+    <div class="legend" style="grid-template-columns:1fr 1fr">
+      <div class="panel deep"><h4>Reglas</h4><p>Borde de tinta de 3 px en todo. Sombra dura hacia abajo, sin difuminados.</p></div>
+      <div class="panel deep"><h4>Color con sentido</h4><p>Menta: seguir o ganar. Rojo: peligro o despedir. Dorado: premio y lo siguiente. Rosa: VIP.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================= HUD -->
+<h2 class="sec-title" id="hud">Pantalla de juego</h2>
+<p class="sec-note">Arriba lo que mide tu club, a la izquierda la misión actual, abajo una barra única con todo lo que haces. Menos píldoras sueltas y mejor agrupadas: tu dinero, tu gente y tu ambiente.</p>
+<div class="stage scene">
+  <div class="hud-top">
+    <div class="panel me">
+      <div class="lvl">8</div>
+      <div class="who">
+        <b>JACKSON</b>
+        <small>Anfitrión de Barrio</small>
+        <div class="bar"><i style="width:23%"></i></div>
+      </div>
+    </div>
+    <div class="hud-mid">
+      <span class="pill"><span class="coin"></span><span class="num">22.032</span></span>
+      <span class="pill"><span class="gem"></span><span class="num">237</span></span>
+      <span class="pill"><svg class="i"><use href="#users"/></svg><span class="num">38/38</span><small>+9 en fila</small></span>
+      <span class="pill vip"><svg class="i"><use href="#star"/></svg><span class="num">80</span></span>
+      <span class="pill"><svg class="i"><use href="#music"/></svg>Fashion Girl Pt. 2</span>
+    </div>
+    <div class="hud-right">
+      <span class="pill"><svg class="i"><use href="#city"/></svg>3 en línea</span>
+      <span class="pill"><svg class="i"><use href="#cloud"/></svg>14:09</span>
+      <span class="round"><svg class="i"><use href="#gear"/></svg></span>
+    </div>
+  </div>
+
+  <div class="panel mission">
+    <div class="top"><span class="tag gold">Misión</span><h4>Gama premium</h4><span class="more">+8 más</span></div>
+    <p>Mejora 2 objetos a la versión Premium (nivel 12): mira cómo cambia su diseño.</p>
+    <div class="row"><div class="bar grow"><i style="width:0%"></i></div><b>0/2</b></div>
+  </div>
+
+  <div class="toasts">
+    <div class="panel toast"><div class="ic" style="background:var(--mint); color:#0b2b1c"><svg class="i"><use href="#check"/></svg></div><div><b>Misión cumplida</b><div class="muted">+1.500 monedas y 40 XP</div></div></div>
+    <div class="panel toast"><div class="ic" style="background:var(--pink); color:#3b0420"><svg class="i"><use href="#star"/></svg></div><div><b>Llegó un famoso</b><div class="muted">Revísalo en la puerta antes de dejarlo pasar</div></div></div>
+  </div>
+
+  <div class="tools"><span class="round"><svg class="i"><use href="#undo"/></svg></span><span class="round"><svg class="i"><use href="#redo"/></svg></span><span class="round"><svg class="i"><use href="#aim"/></svg></span><span class="round"><svg class="i"><use href="#eye"/></svg></span></div>
+
+  <div class="tipcard">
+    <div class="panel tip">
+      <div class="mascot"><svg class="i" style="width:1em;height:1em"><use href="#bulb"/></svg></div>
+      <div><h4>Aquí se mejoran los objetos</h4><p>Toca una pieza de tu club y pulsa Mejorar. Cada versión suena y se ve mejor.</p>
+      <div class="acts"><button class="btn small go">Entendido</button><span class="muted">1 de 3 consejos</span></div></div>
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="panel log"><div><b>Lamda94</b> hola, ¿quién se viene a mi disco?</div><div><b>Jesusito</b> voy, ya salgo</div></div>
+    <div class="in"><input placeholder="Escribe aquí y pulsa Enter"><button class="btn small go">Enviar</button></div>
+  </div>
+
+  <div class="panel minimap"><b style="font-family:var(--font-display); font-size:12px">CIUDAD</b>
+    <div class="g"><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i class="away"></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i class="me"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i></div>
+  </div>
+
+  <div class="panel ctx"><b>Barra recta · Premium</b><button class="btn small">Mover</button><button class="btn small gold"><svg class="i"><use href="#up"/></svg>Mejorar <span class="price"><span class="coin"></span>900</span></button><button class="btn small hot">Vender</button></div>
+
+  <div class="panel dock">
+    <div class="d open"><svg class="i"><use href="#door"/></svg>Cerrar club</div>
+    <div class="d"><svg class="i"><use href="#bag"/></svg>Tienda</div>
+    <div class="d"><svg class="i"><use href="#box"/></svg>Inventario</div>
+    <div class="d"><svg class="i"><use href="#flag"/></svg>Misiones<i class="dot"></i></div>
+    <div class="d"><svg class="i"><use href="#desk"/></svg>Oficina</div>
+    <div class="d"><svg class="i"><use href="#street"/></svg>Entrar</div>
+    <div class="d"><svg class="i"><use href="#person"/></svg>Personaje</div>
+  </div>
+</div>
+<p class="cap">La barra de abajo mantiene tus siete botones. Cambia que el estado "club abierto" se vea con el botón verde, la insignia roja avisa de algo nuevo, y el consejo contextual aparece junto a lo que explica.</p>
+
+<!-- ======================================================= MODALS -->
+<h2 class="sec-title" id="menus">Ventanas</h2>
+<p class="sec-note">Todas comparten la marquesina de arriba. El color de la marquesina dice de qué trata: rojo para comprar y gestionar, azul para consultar, dorado para premios, oscuro para lo ilegal.</p>
+<div class="shelf">
+
+  <!-- shop -->
+  <div class="panel modal">
+    <div class="marquee"><h3>Tienda</h3><div class="modal-head-extra"><span class="pill"><span class="coin"></span><span class="num">22.032</span></span><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="tabs"><span class="tab on">Barras</span><span class="tab">Asientos</span><span class="tab">Mesas</span><span class="tab">DJ y sonido</span><span class="tab">Luces</span></div>
+      <div class="shopgrid">
+        <div class="item"><div class="thumb" style="background:#7a3d1d">🍸</div><h4>Barra recta</h4><span class="price"><span class="coin"></span>1.500</span><button class="btn small go">Comprar</button></div>
+        <div class="item"><div class="thumb" style="background:#3d2a6e">🛋️</div><h4>Sofá rojo</h4><span class="price"><span class="coin"></span>800</span><button class="btn small go">Comprar</button></div>
+        <div class="item"><div class="thumb" style="background:#26525c">🔊</div><h4>Altavoz</h4><span class="price"><span class="coin"></span>2.400</span><button class="btn small" disabled>Nivel 10</button></div>
+      </div>
+      <div class="panel deep" style="padding:12px; display:grid; gap:8px">
+        <div class="row"><h4 style="font-size:15px">Barra recta</h4><span class="tag mint">La tienes ×1</span></div>
+        <div class="ladder"><div class="s have">De sótano</div><div class="s next">Profesional<br>nivel 4</div><div class="s lock">Premium<br>nivel 12</div><div class="s lock">Élite<br>nivel 25</div></div>
+        <p class="muted" style="font-size:13px; font-weight:600">Cada versión suena y se ve mejor. Mejorar una pieza cuesta menos que comprarla nueva.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- office -->
+  <div class="panel modal">
+    <div class="marquee blue"><h3>Oficina</h3><div class="modal-head-extra"><span class="pill"><span class="coin"></span><span class="num">22.032</span></span><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="stats"><div class="stat"><span class="muted">Ganancia</span><b>+310/min</b></div><div class="stat"><span class="muted">Sueldos</span><b>−8/min</b></div><div class="stat"><span class="muted">Mantenimiento</span><b>−44/min</b></div></div>
+      <div class="card"><div class="thumb">🎧</div><div class="grow"><h4>DJ</h4><div class="muted">Pone la música y sube el ambiente</div></div><button class="btn small go">Contratar <span class="price"><span class="coin"></span>600</span></button></div>
+      <div class="card"><div class="thumb">🛡️</div><div class="grow"><h4>Guardia ×1</h4><div class="muted">Revisa a los famosos en la puerta</div></div><button class="btn small hot">Despedir</button></div>
+      <div class="card"><div class="thumb">🏗️</div><div class="grow"><h4>Ampliar el local</h4><div class="muted">Club mediano · se abre en el nivel 12</div></div><button class="btn small gold">Ver obra</button></div>
+      <div class="panel deep" style="padding:10px 12px"><b>Próximos desbloqueos</b><div class="row" style="margin-top:8px; flex-wrap:wrap"><span class="tag"><svg class="i"><use href="#lock"/></svg>Nivel 10 · Asaltos y Zeta</span><span class="tag"><svg class="i"><use href="#lock"/></svg>Nivel 12 · Caja fuerte</span></div></div>
+    </div>
+  </div>
+
+  <!-- music -->
+  <div class="panel modal">
+    <div class="marquee dark"><h3>Música</h3><div class="modal-head-extra"><span class="pill vip"><svg class="i"><use href="#star"/></svg><span class="num">80</span></span><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="panel deep" style="padding:12px; display:grid; gap:10px">
+        <div><span class="tag mint">Sonando</span><h4 style="font-size:17px; margin-top:6px">Fashion Girl Pt. 2 · Bad Gyal, Jadiel</h4></div>
+        <div class="row"><button class="btn small">Anterior</button><button class="btn small go">Pausa</button><button class="btn small">Siguiente</button><div class="slider grow"><i style="width:70%"></i><b style="left:70%"></b></div></div>
+      </div>
+      <div class="card"><div class="thumb" style="background:var(--pink)">♪</div><div class="grow"><h4>Silla · Yailin La Más Viral</h4><div class="muted">Reggaetón · 108 BPM · Canción del juego</div></div><button class="btn small go">Poner</button></div>
+      <div class="card"><div class="thumb" style="background:var(--sky); color:#06324a">♪</div><div class="grow"><h4>Compa Coleto · Aria Vega</h4><div class="muted">Pop · 118 BPM · Canción del juego</div></div><button class="btn small go">Poner</button></div>
+      <div><b>Lo que le gusta a tu público</b><div class="row" style="align-items:flex-end; height:70px; margin-top:8px"><div class="grow" style="height:80%; background:var(--pink); border:3px solid var(--ink); border-radius:8px 8px 0 0"></div><div class="grow" style="height:55%; background:var(--gold); border:3px solid var(--ink); border-radius:8px 8px 0 0"></div><div class="grow" style="height:35%; background:var(--sky); border:3px solid var(--ink); border-radius:8px 8px 0 0"></div><div class="grow" style="height:20%; background:var(--mint); border:3px solid var(--ink); border-radius:8px 8px 0 0"></div><div class="grow" style="height:12%; background:var(--wall); border:3px solid var(--ink); border-radius:8px 8px 0 0"></div></div></div>
+      <button class="btn">Subir mi propia canción</button>
+    </div>
+  </div>
+
+  <!-- missions -->
+  <div class="panel modal">
+    <div class="marquee gold"><h3>Misiones</h3><div class="modal-head-extra"><span class="tag">Capítulo 3</span><span class="round" style="width:36px;height:36px; color:var(--text)"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="card"><div class="thumb" style="background:var(--mint); color:#0b2b1c"><svg class="i"><use href="#check"/></svg></div><div class="grow"><h4>Se oye una alarma</h4><div class="muted">Compra una alarma en Tienda › Seguridad</div></div><button class="btn small gold">Reclamar</button></div>
+      <div class="card"><div class="thumb">🛡️</div><div class="grow"><h4>Lo valioso, bajo llave</h4><div class="muted">Compra una caja fuerte (nivel 12)</div><div class="bar" style="margin-top:6px"><i style="width:0%"></i></div></div><span class="tag gold">+750 XP</span></div>
+      <div class="card"><div class="thumb">🕶️</div><div class="grow"><h4>Zeta tiene un trabajo</h4><div class="muted">Haz tu primer asalto con éxito</div><div class="bar" style="margin-top:6px"><i style="width:0%"></i></div></div><span class="tag gold">+2.000 XP</span></div>
+      <p class="muted" style="font-size:13px">Las misiones dan experiencia de sobra: completar una es la forma más rápida de subir de nivel.</p>
+    </div>
+  </div>
+
+  <!-- menu -->
+  <div class="panel modal">
+    <div class="marquee blue"><h3>Menú</h3><div class="modal-head-extra"><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="card"><div class="grow"><h4>Gráficos</h4><div class="muted">Si va lento, baja la calidad. En Automático se ajusta solo.</div></div></div>
+      <div class="row" style="flex-wrap:wrap"><button class="btn small go">Automático</button><button class="btn small">Alto</button><button class="btn small">Medio</button><button class="btn small">Bajo</button></div>
+      <div class="card"><div class="grow"><h4>Partida en la nube</h4><div class="muted">Tu código de recuperación: 7f3a-91c2-0e4b</div></div><button class="btn small">Copiar</button></div>
+      <div class="card"><div class="grow"><h4>Guía del juego</h4><div class="muted">Vuelve a leer los consejos que ya desbloqueaste</div></div><button class="btn small gold">Abrir guía</button></div>
+      <div class="card"><div class="grow"><h4>Empezar de nuevo</h4><div class="muted">Borra tu club. No se puede deshacer.</div></div><button class="btn small hot">Borrar</button></div>
+    </div>
+  </div>
+
+  <!-- inventory -->
+  <div class="panel modal">
+    <div class="marquee"><h3>Inventario</h3><div class="modal-head-extra"><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="shopgrid">
+        <div class="item"><div class="thumb" style="background:#7a3d1d">🏆</div><h4>Copa en pedestal</h4><span class="tag">×1</span><button class="btn small go">Colocar</button></div>
+        <div class="item"><div class="thumb" style="background:#3d2a6e">🪴</div><h4>Planta</h4><span class="tag">×3</span><button class="btn small go">Colocar</button></div>
+        <div class="item"><div class="thumb" style="background:#26525c">💡</div><h4>Luz neón</h4><span class="tag">×2</span><button class="btn small go">Colocar</button></div>
+      </div>
+      <p class="muted" style="font-size:13px">Lo que compras y todavía no pones en el club vive aquí. Vender una pieza te devuelve la mitad de lo que pagaste.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================= POPUPS -->
+<h2 class="sec-title" id="popups">Avisos y popups</h2>
+<p class="sec-note">Lo que aparece solo: subir de nivel, llegar un famoso, hablar con un personaje o confirmar algo grave. Ninguno tapa el club más de lo necesario y todos dicen qué pasa y qué puedes hacer.</p>
+<div class="shelf">
+
+  <div class="panel modal levelup rays">
+    <div class="marquee gold" style="justify-content:center"><h3>¡Subiste de nivel!</h3></div>
+    <div class="body">
+      <div class="big">9</div>
+      <div class="muted">Nuevo nivel desbloqueado: esto es lo que ya puedes hacer</div>
+      <div class="unl">
+        <div class="card"><div class="thumb">🛋️</div><div><h4 style="font-size:14px">Sofá rojo</h4><div class="muted" style="font-size:12px">Tienda › Asientos</div></div></div>
+        <div class="card"><div class="thumb">🎨</div><div><h4 style="font-size:14px">Fachada dorada</h4><div class="muted" style="font-size:12px">Oficina › Fachada</div></div></div>
+        <div class="card"><div class="thumb">🛡️</div><div><h4 style="font-size:14px">Guardia</h4><div class="muted" style="font-size:12px">Oficina › Equipo</div></div></div>
+        <div class="card"><div class="thumb">🔒</div><div><h4 style="font-size:14px">Siguiente: nivel 10</h4><div class="muted" style="font-size:12px">Asaltos y Zeta</div></div></div>
+      </div>
+      <button class="btn go" style="justify-self:center">Seguir jugando</button>
+    </div>
+  </div>
+
+  <div style="display:grid; gap:22px">
+    <div class="panel vipcard">
+      <div class="thumb" style="width:76px; height:76px; background:var(--pink); font-size:40px">💃</div>
+      <div style="display:grid; gap:8px"><div><span class="tag" style="background:var(--pink); color:#3b0420">VIP en la puerta</span><h4 style="font-size:16px; margin-top:6px">Dice que es Valentina Luz, cantante</h4><div class="muted">Revisarla cuesta 300. Los famosos suben el ambiente.</div></div>
+      <div class="row" style="flex-wrap:wrap"><button class="btn small gold">Revisar <span class="price"><span class="coin"></span>300</span></button><button class="btn small go">Dejar pasar</button><button class="btn small hot">Rechazar</button></div></div>
+    </div>
+
+    <div class="panel" style="padding:14px; display:grid; gap:8px">
+      <span class="tag mint" style="justify-self:start">Jugador en línea</span>
+      <h4 style="font-size:18px">CHUPACULO</h4>
+      <div class="muted">Nivel 11 · Ambiente 64 · Abierto</div>
+      <div class="muted">Suena: Silla · Yailin La Más Viral</div>
+      <div class="row" style="flex-wrap:wrap"><button class="btn go">Entrar a ver su club</button><button class="btn hot">Asaltar</button><button class="btn ghost">Cerrar</button></div>
+    </div>
+
+    <div class="panel" style="padding:14px; display:grid; gap:12px">
+      <div class="row"><div class="thumb" style="background:var(--red)">⚠️</div><div><h4 style="font-size:16px">¿Borrar tu partida?</h4><div class="muted">Perderás tu club, tus monedas y tu nivel. No hay vuelta atrás.</div></div></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost">Mejor no</button><button class="btn hot">Sí, borrar todo</button></div>
+    </div>
+  </div>
+
+  <div class="panel dialog">
+    <div class="face">👩🏽‍🎤</div>
+    <div style="display:grid; gap:6px; align-content:start">
+      <span class="name">ROSA</span>
+      <p>Alguien anda mirando locales de noche, niña. Ponle una alarma a esa puerta antes de que se le antoje la tuya.</p>
+      <div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12px">Toca para seguir</span><button class="btn small go">Seguir</button></div>
+    </div>
+  </div>
+
+  <div style="display:grid; gap:22px">
+    <div class="ticket sticker"><b style="font-family:var(--font-display); font-weight:400; font-size:16px">Entrada · Noche del Apagón</b><span>Sábado 2:00 a 5:00 · el calor baja el doble de rápido</span></div>
+    <div class="panel notice">
+      <div class="siren">🚨</div>
+      <div><h4 style="font-size:16px">La Brigada del Ruido pasó por tu club</h4><div class="muted">Se llevó la Estatua dorada y cobró 1.200 de multa. Club clausurado 6 h.</div><div class="row" style="margin-top:8px"><button class="btn small">Ver el informe</button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================= GUIDE -->
+<h2 class="sec-title" id="guia">La guía que enseña a medida que avanzas</h2>
+<p class="sec-note">Nada de manual al principio. Cada cosa nueva se explica la primera vez que la necesitas: un consejo corto junto al botón, con un aro dorado que señala dónde. Todo queda guardado en una Guía que puedes releer.</p>
+<div class="grid2">
+  <div class="panel scene" style="position:relative; min-height:360px; border-radius:18px">
+    <div class="panel dock" style="bottom:20px; left:50%">
+      <div class="d"><svg class="i"><use href="#door"/></svg>Abrir club</div>
+      <div class="d"><svg class="i"><use href="#bag"/></svg>Tienda</div>
+      <div class="d" style="position:relative"><svg class="i"><use href="#desk"/></svg>Oficina<div class="pulse-ring" style="inset:-6px"></div></div>
+      <div class="d"><svg class="i"><use href="#street"/></svg>Entrar</div>
+    </div>
+    <div class="panel tip" style="position:absolute; left:50%; bottom:128px; transform:translateX(-18%); width:320px">
+      <div class="mascot"><svg class="i" style="width:1em;height:1em"><use href="#bulb"/></svg></div>
+      <div><h4>Tu oficina</h4><p>Aquí contratas DJ, guardia y bartender, y ves cuánto ganas por minuto.</p>
+      <div class="acts"><button class="btn small go">Abrirla</button><button class="btn small ghost">Luego</button></div></div>
+    </div>
+  </div>
+  <div class="panel" style="padding:16px; display:grid; gap:10px">
+    <div class="row"><h3 style="font-size:20px">Guía</h3><span class="tag mint">12 de 30 consejos</span></div>
+    <div class="card"><div class="thumb" style="background:var(--mint); color:#0b2b1c"><svg class="i"><use href="#check"/></svg></div><div class="grow"><h4>Abre tu club</h4><div class="muted">Sin música y sin puerta abierta no entra nadie.</div></div></div>
+    <div class="card"><div class="thumb" style="background:var(--mint); color:#0b2b1c"><svg class="i"><use href="#check"/></svg></div><div class="grow"><h4>Mejora tus objetos</h4><div class="muted">Toca una pieza y pulsa Mejorar.</div></div></div>
+    <div class="card"><div class="thumb" style="background:var(--gold); color:#3a2600"><svg class="i"><use href="#bulb"/></svg></div><div class="grow"><h4>Los famosos</h4><div class="muted">Se desbloquea con ambiente 78 o más.</div></div><span class="tag gold">Pendiente</span></div>
+    <div class="card" style="opacity:.6"><div class="thumb"><svg class="i"><use href="#lock"/></svg></div><div class="grow"><h4>Asaltos</h4><div class="muted">Se explica al llegar al nivel 10.</div></div></div>
+  </div>
+</div>
+<div class="legend" style="margin-top:18px">
+  <div class="panel"><h4>Cuándo sale un consejo</h4><p>La primera vez que abres una ventana, que subes de nivel, que compras algo nuevo o que ocurre algo (un famoso, un robo, la policía).</p></div>
+  <div class="panel"><h4>Cuánto molesta</h4><p>Uno a la vez, nunca tapa el botón que explica y se cierra solo si ya lo hiciste. "Luego" lo manda a la Guía.</p></div>
+  <div class="panel"><h4>Dónde queda</h4><p>En el Menú › Guía, con lo ya aprendido en verde y lo siguiente en dorado.</p></div>
+</div>
+
+<!-- ======================================================= HEIST -->
+<h2 class="sec-title" id="asalto">Robos y policía</h2>
+<p class="sec-note">Lo ilegal usa la marquesina oscura, para que se note que estás en otro modo de juego.</p>
+<div class="shelf">
+  <div class="panel modal">
+    <div class="marquee dark"><h3>Asalto</h3><div class="modal-head-extra"><span class="pill red"><svg class="i"><use href="#fire"/></svg><span class="num">22</span></span><span class="round" style="width:36px;height:36px"><svg class="i"><use href="#close"/></svg></span></div></div>
+    <div class="body">
+      <div class="row"><div class="grow"><h4 style="font-size:18px">CHUPACULO</h4><div class="muted">Nivel 11 · abierto, 22 invitados</div></div></div>
+      <div class="row" style="flex-wrap:wrap"><span class="tag"><svg class="i"><use href="#shield"/></svg>1 guardia</span><span class="tag red">Con alarma</span><span class="tag">Poca gente</span><span class="tag gold">Caja: media</span></div>
+      <div class="card" style="outline:3px solid var(--gold)"><div class="thumb">🏆</div><div class="grow"><h4>Estatua dorada</h4><div class="muted">Premium · vale 9.600</div></div><span class="tag mint">Elegida</span></div>
+      <div class="card"><div class="thumb">🔓</div><div class="grow"><h4>Ganzúas ×1</h4><div class="muted">+8% de probabilidad</div></div><button class="btn small go">Llevar ✓</button></div>
+      <div class="row"><span class="muted grow">Probabilidad aproximada</span><b style="font-family:var(--font-display); font-size:22px">58%</b></div>
+      <div class="row"><button class="btn hot grow">Forzar la cerradura</button><button class="btn ghost">A la suerte</button></div>
+    </div>
+  </div>
+
+  <div class="panel modal lockgame">
+    <div class="marquee dark"><h3>Forzando la cerradura</h3></div>
+    <div class="body">
+      <div class="pins"><i class="ok"></i><i class="cur"></i><i></i></div>
+      <div class="barx"><div class="zone"></div><div class="needle"></div></div>
+      <p class="muted" style="text-align:center">Pulsa cuando la aguja pase por lo verde. Pin 2 de 3.</p>
+      <button class="btn go" style="justify-self:center; min-width:180px">¡Ahora!</button>
+      <p class="muted" style="text-align:center; font-size:12px">También puedes usar la barra espaciadora.</p>
+    </div>
+  </div>
+</div>
+
+<p class="sec-note" style="margin-top:40px">Siguiente paso, si te gusta: aplico esto al juego por partes (primero la pantalla de juego y la barra de abajo, luego las ventanas, luego los avisos y la guía), revisando que compile en cada parte. Si algo no te convence, dime cuál y lo cambio aquí en esta hoja antes de tocar el juego.</p>
+</div>
+</body>
+</html>

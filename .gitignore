@@ -1,0 +1,19 @@
+# dependencies and builds
+node_modules/
+web/dist/
+web/.vite/
+
+# the players' data: saves, the world, uploaded songs and every backup (private: the recovery code of a game is its id)
+server/data/
+server/data.backup-*/
+
+# the songs of the game (copyrighted, and heavy): copy them to songs/ on each machine
+songs/*.mp3
+
+# generated pictures, logs, editors, local tools
+art/previews/
+*.log
+.DS_Store
+.claude/
+.env
+.env.*

@@ -1,0 +1,200 @@
+// "Novedades": what is new in each version of the game, shown once to every player with pictures and where to find it.
+// Add a new entry at the TOP of NEWS for every release: players who have not seen its id get the window on their next visit.
+
+export interface NewsEntry {
+  /** an object of the catalog (its picture is drawn) or an icon name from ui/icons.ts */
+  kind: 'item' | 'icon';
+  /** catalog id or icon name */
+  ref: string;
+  /** version of the object to draw */
+  tier?: number;
+  title: string;
+  text: string;
+  /** where to find it in the game */
+  where?: string;
+}
+
+export interface News {
+  id: string;
+  date: string;
+  title: string;
+  intro: string;
+  entries: NewsEntry[];
+}
+
+export const NEWS: News[] = [
+  {
+    id: '2026-11-25i',
+    date: '25 de noviembre de 2026',
+    title: 'El aforo ya no se queda en 40',
+    intro: 'Tu club puede llenarse más a medida que sube de nivel y se expande.',
+    entries: [
+      { kind: 'icon', ref: 'guests', title: 'Más gente con el nivel', text: 'El máximo de personas dentro crece con tu nivel: unas 50 en el nivel 13, 75 en el 23, 115 en el 36 y más adelante cientos. Antes se quedaba pegado en 40.', where: 'Píldora de invitados (arriba)' },
+      { kind: 'icon', ref: 'city', title: 'La ampliación lo desbloquea', text: 'Cada edificio tiene su techo: el Bar de barrio llega a 52, el Club a 64, el Club grande a 100 y el Mega club a 150. Para llenar más hay que ampliar el local y tener pista y asientos para todos.', where: 'Oficina › Ampliación del local' },
+    ],
+  },
+  {
+    id: '2026-11-25h',
+    date: '25 de noviembre de 2026',
+    title: 'Una prisión con más vida',
+    intro: 'La cárcel se ve mejor y ya no estás solo.',
+    entries: [
+      { kind: 'icon', ref: 'guests', title: 'Ves a los otros presos', text: 'Los demás jugadores presos aparecen en la cárcel con su traje naranja y su nombre, caminando a sus tareas y trabajando. También hay un guardia vigilando desde su escritorio.', where: 'Cuando estás preso' },
+      { kind: 'icon', ref: 'star', title: 'Una cárcel más cuidada', text: 'Paredes de dos colores, pisos distintos para cada zona, letreros (PRISIÓN, BAÑOS, COCINA), ventanas con barrotes, faroles, el patio con césped y alambre de púas.', where: 'Prisión' },
+    ],
+  },
+  {
+    id: '2026-11-25g',
+    date: '25 de noviembre de 2026',
+    title: 'La prisión ahora es un edificio',
+    intro: 'Caminas por la cárcel y trabajas de verdad.',
+    entries: [
+      { kind: 'icon', ref: 'street', title: 'Un edificio con sus rincones', text: 'La cámara se va a la prisión: una celda, el baño con tres inodoros, la cocina, la lavandería, un pasillo con charcos, una pared por pintar y un patio lleno de hojas. Tu personaje va con traje naranja.', where: 'Cuando estás preso' },
+      { kind: 'icon', ref: 'check', title: 'Tu personaje hace las tareas', text: 'Eliges la tarea y camina hasta su lugar: friega los inodoros, trapea, lava platos, dobla ropa, pinta la pared o barre el patio, cada una con su animación. La suciedad de cada lugar va desapareciendo.', where: 'Botones de tareas abajo' },
+      { kind: 'icon', ref: 'guests', title: 'Aviso a toda la ciudad', text: 'Al conectarte te cuentan quién está preso, por intentar asaltar a quién y cuántas tareas lleva. También se avisa cuando cae uno nuevo y cuando sale.', where: 'Chat y avisos' },
+    ],
+  },
+  {
+    id: '2026-11-25f',
+    date: '25 de noviembre de 2026',
+    title: 'La prisión: tareas para salir',
+    intro: 'Quien falla un asalto ya no pasea por la ciudad: va a una celda y se gana la salida.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Tareas para salir', text: 'En prisión hay que limpiar baños, trapear, lavar platos, doblar ropa, pintar y barrer. Son 20 tareas (30 si el objetivo tenía alarma o la pieza era pesada); entre más haces, más rápido sales. Si no las haces, sales solo a las 6 horas. Tu club queda cerrado mientras estés dentro.', where: 'Cuando te atrapan asaltando' },
+      { kind: 'icon', ref: 'guests', title: 'Todos se enteran', text: 'Cuando alguien cae preso, la ciudad lo anuncia: quién fue y a quién intentó asaltar. También avisa cuando sale. La lista de presos está en el Ranking.', where: 'Chat, avisos y Ranking' },
+      { kind: 'icon', ref: 'check', title: 'Solo van presos los que fallan', text: 'Un robo que nadie vio no se castiga. Corregimos un castigo que se había aplicado a quienes robaron con éxito: se les levantó la prisión y se les devolvió la multa.', where: 'Asaltos' },
+    ],
+  },
+  {
+    id: '2026-11-25e',
+    date: '25 de noviembre de 2026',
+    title: 'La Brigada se lleva a los ladrones',
+    intro: 'Cuando te atrapan robando, ahora lo ves como en una película.',
+    entries: [
+      { kind: 'icon', ref: 'street', title: 'Escena de arresto', text: 'Llegan las patrullas, el comisario Ferro te esposa y te muestra las pruebas sobre la mesa: qué te llevaste (o ibas a llevarte), a quién y con qué equipo. Después, la celda.', where: 'Cuando falla un asalto' },
+      { kind: 'icon', ref: 'lock', title: 'Robos antiguos castigados', text: 'Quien robó antes de que existiera la cárcel ya fue a prisión: el club cierra 15 minutos y paga una multa del 5% de sus monedas, con su propia escena de arresto.', where: 'Al volver a entrar al juego' },
+    ],
+  },
+  {
+    id: '2026-11-25d',
+    date: '25 de noviembre de 2026',
+    title: 'Ajustes: protector más barato y shows que sí pagan',
+    intro: 'Hicimos caso a lo que dijeron los jugadores.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Protector antirrobos más barato', text: 'Ahora cuesta 400 monedas por nivel y por hora (antes 700). A nivel 11, 2 horas valen 8.800.', where: 'Oficina › Protector antirrobos' },
+      { kind: 'item', ref: 'dance_cage', tier: 4, title: 'Shows que pagan 5 veces más', text: 'La jaula de baile deja 300 monedas por minuto en la versión 1 y 1.250 en la Élite; el podio, un 40% de eso. La bailarina cobra más, pero sigue valiendo la pena.', where: 'Tienda › Shows' },
+      { kind: 'item', ref: 'gold_statue', tier: 4, title: 'Trofeos que pagan 5 veces más', text: 'La Estatua dorada deja 120 por minuto en la versión 1 y 480 en la Élite. Cada trofeo muestra en su descripción lo que gana.', where: 'Tienda › Trofeos' },
+    ],
+  },
+  {
+    id: '2026-11-25c',
+    date: '25 de noviembre de 2026',
+    title: 'Robos más estrictos',
+    intro: 'Protégete de verdad, y los ladrones atrapados lo pagan caro. Además, ahora ves cuánto ganan tus trofeos y shows.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Protector antirrobos', text: 'Compra 2, 6, 12 o 24 horas en las que nadie puede asaltar tu club. Cuesta más cuanto más nivel tienes, no pasa de 24 horas seguidas y lo pierdes si tú asaltas a alguien.', where: 'Oficina › Protector antirrobos' },
+      { kind: 'icon', ref: 'street', title: 'Prisión para los ladrones', text: 'Si te atrapan asaltando: vas a prisión, tu propio club cierra 10 minutos (15 si el objetivo tenía alarma o la pieza era pesada), pagas una multa del 5% de tus monedas y no puedes asaltar en unas horas.', where: 'Asaltos' },
+      { kind: 'item', ref: 'gold_statue', tier: 4, title: 'Trofeos que ganan monedas', text: 'Cada trofeo paga por minuto con el club abierto, música y gente dentro, y más cuanto mejor la versión. Ahora la tienda dice cuánto gana cada uno.', where: 'Tienda › Trofeos' },
+      { kind: 'item', ref: 'dance_cage', tier: 4, title: 'Shows con ingresos a la vista', text: 'La jaula y el podio de baile muestran en su descripción cuánto dejan por minuto en cada versión y cuánto cobra la bailarina.', where: 'Tienda › Shows' },
+    ],
+  },
+  {
+    id: '2026-11-25b',
+    date: '25 de noviembre de 2026',
+    title: 'Competencia, reseñas y arreglos',
+    intro: 'Ahora los clubes compiten por la gente, y tus invitados te dicen qué mejorar.',
+    entries: [
+      { kind: 'icon', ref: 'star', title: 'Ranking de la ciudad', text: 'Todos los clubes abiertos compiten por su fama: ambiente, lujo, nivel, famosos y reseñas. El primero recibe hasta 30% más gente en la puerta y el último 25% menos: la gente se va a otras discos.', where: 'Píldora "Puesto" arriba y Oficina › Ranking' },
+      { kind: 'icon', ref: 'guests', title: 'Reseñas de tus invitados', text: 'Cuando se van, dejan estrellas y un comentario: música, fila, asientos, barra, pista, decoración. Te dicen qué quejas se repiten y adónde ir para arreglarlas.', where: 'Oficina › Reseñas de tus invitados' },
+      { kind: 'icon', ref: 'city', title: 'El club solo gana con el servidor encendido', text: 'Si el servidor está apagado o no tienes conexión, tu club no genera nada. Mientras no estás (o con la pestaña oculta), el servidor trabaja tu club: 35% de lo normal, hasta 8 horas, y te llega una carta al volver.', where: 'Al entrar al juego' },
+      { kind: 'icon', ref: 'check', title: 'Famosos arreglados', text: 'Ahora sí pagan al dejarlos pasar (antes el clic se perdía) y ya no aparece uno cada vez que recargas la página.', where: 'La puerta del club' },
+      { kind: 'icon', ref: 'missions', title: 'Más misiones, y de protección', text: 'El capítulo 3 se abre desde el nivel 10: hay misiones de seguridad (alarma, cámara, club blindado) y de asaltos. "Sonido de estudio" ahora pide mejorar el equipo de sonido, como dice su texto.', where: 'Misiones' },
+      { kind: 'icon', ref: 'menu', title: 'Mejor en el celular', text: 'La barra de abajo, la tienda y las ventanas se acomodan a pantallas chicas, vertical y horizontal.', where: 'Todo el juego' },
+    ],
+  },
+  {
+    id: '2026-11-25',
+    date: '25 de noviembre de 2026',
+    title: 'Once canciones nuevas',
+    intro: 'Ahora hay 20 canciones para poner, y por primera vez suenan house y salsa de verdad.',
+    entries: [
+      { kind: 'icon', ref: 'music', title: 'Reggaetón y dembow', text: '6 AM de J Balvin y Farruko, Voy a amanecer, Ragga Tonseh, Carne hincha, El Tiki y Qué sientes.', where: 'Música › Canciones' },
+      { kind: 'icon', ref: 'music', title: 'Latin house y afrohouse', text: 'Trabaje papi y Lomilo: ideales para el público que baila hip hop, disco y robot.', where: 'Música › Canciones' },
+      { kind: 'icon', ref: 'music', title: 'Salsa y tropical', text: 'La gozadera de Gente de Zona con Marc Anthony y Vamos pa la playa: con ellas el público baila salsa y merengue.', where: 'Música › Canciones' },
+      { kind: 'icon', ref: 'star', title: 'Una más para el ambiente', text: 'A lo natural, de estilo pop. Prueba géneros distintos: cada invitado tiene su favorito y el ambiente sube con lo que le gusta a la mayoría.', where: 'Música' },
+    ],
+  },
+  {
+    id: '2026-11-24e',
+    date: '24 de noviembre de 2026',
+    title: 'A bailar',
+    intro: 'Tu personaje ya sabe bailar, y el público de tu club también.',
+    entries: [
+      { kind: 'icon', ref: 'dance', title: 'Doce bailes y gestos', text: 'Dancehall, reggaetón, salsa, merengue, hip hop, disco, cumbia, robot, saltos y la ola, más aplaudir y saludar. Se abren con el nivel.', where: 'Botón Bailar (o la tecla B)' },
+      { kind: 'icon', ref: 'guests', title: 'Los demás te ven bailar', text: 'En tu club, en el de un vecino o en la calle: tu baile se ve igual para todos y sigue el ritmo de la canción.', where: 'Multijugador' },
+      { kind: 'icon', ref: 'music', title: 'El público baila según la música', text: 'Con reggaetón bailan dancehall y perreo suave, con salsa bailan salsa y merengue, con rock saltan. Cambia la música y cambian los bailes.', where: 'Tu club' },
+      { kind: 'icon', ref: 'check', title: 'Los invitados ya se sientan bien', text: 'Arreglé un fallo por el que nunca doblaban las piernas al sentarse.', where: 'Sillas, sofás y taburetes' },
+    ],
+  },
+  {
+    id: '2026-11-24d',
+    date: '24 de noviembre de 2026',
+    title: 'Trece objetos más',
+    intro: 'Nuevas barras, una cabina DJ profesional, pantallas, un segundo show y cámaras de seguridad.',
+    entries: [
+      { kind: 'item', ref: 'dj_booth_pro', tier: 4, title: 'Cabina DJ profesional', text: 'Tres platos, mezclador y pantalla de luz. Cuenta como cabina y mejora el sonido.', where: 'Tienda › DJ y sonido · nivel 24' },
+      { kind: 'item', ref: 'bar_long', tier: 4, title: 'Barra larga de lujo', text: 'Cinco puestos para servir tragos a la vez. Tu bartender también trabaja en ella.', where: 'Tienda › Barras · nivel 25' },
+      { kind: 'item', ref: 'bar_corner', tier: 3, title: 'Barra de esquina y de cócteles', text: 'Más lugares donde pedir un trago, desde un club pequeño.', where: 'Tienda › Barras · nivel 9 y 16' },
+      { kind: 'item', ref: 'pole_podium', tier: 4, title: 'Podio de baile', text: 'Un show más barato que la jaula: menos propinas, pero cabe en cualquier esquina.', where: 'Tienda › Shows · nivel 18' },
+      { kind: 'item', ref: 'video_wall', tier: 4, title: 'Muro de video', text: 'Cuatro pantallas altas para toda la pista. Más pantallas: tótem LED y doble pantalla.', where: 'Tienda › Pantallas · nivel 19, 23 y 33' },
+      { kind: 'item', ref: 'moving_heads', tier: 4, title: 'Luces móviles', text: 'Dos lámparas que giran sobre la pista.', where: 'Tienda › Luces · nivel 19' },
+      { kind: 'item', ref: 'sofa_corner', tier: 3, title: 'Sofá de esquina', text: 'Tres plazas en L para la zona de descanso.', where: 'Tienda › Asientos · nivel 15' },
+      { kind: 'item', ref: 'photo_booth', tier: 4, title: 'Cabina de fotos y arcade', text: 'Para que la gente se quede más tiempo y tu club tenga rincones con gracia.', where: 'Tienda › Decoración · nivel 13 y 17' },
+      { kind: 'item', ref: 'camera', tier: 3, title: 'Cámara de seguridad', text: 'Cada cámara (hasta 3) hace más difícil que te asalten.', where: 'Tienda › Seguridad · nivel 12' },
+    ],
+  },
+  {
+    id: '2026-11-24c',
+    date: '24 de noviembre de 2026',
+    title: 'Reformas mucho más baratas',
+    intro: 'Las cinco reformas del local costaban demasiado para lo que se gana en cada nivel.',
+    entries: [
+      { kind: 'icon', ref: 'monitor', title: 'Reformas del local', text: 'Ahora cuestan unas 12 veces menos: la primera pasa de 180.000 a 15.000 monedas, y las siguientes bajan en la misma proporción. Cada reforma sube el lujo, el cover y el ánimo de la gente.', where: 'Oficina › Reformas del local · desde el nivel 8' },
+    ],
+  },
+  {
+    id: '2026-11-24b',
+    date: '24 de noviembre de 2026',
+    title: 'Quince objetos nuevos',
+    intro: 'Más para comprar entre el nivel 11 y el 31: asientos VIP, sonido, luces, premios y decoración.',
+    entries: [
+      { kind: 'item', ref: 'lounge_bed', tier: 4, title: 'Cama lounge', text: 'Cuatro plazas de lujo con dosel de luz. Los invitados se quedan más tiempo.', where: 'Tienda › Asientos · nivel 28' },
+      { kind: 'item', ref: 'sofa_vip', tier: 3, title: 'Sofá VIP de 3 plazas', text: 'Cuero y tachuelas cromadas para la zona reservada.', where: 'Tienda › Asientos · nivel 21' },
+      { kind: 'item', ref: 'table_vip', tier: 4, title: 'Mesa de botellas', text: 'Botellas, hielo y mucho lujo para que tu zona VIP se vea como tal.', where: 'Tienda › Mesas · nivel 17' },
+      { kind: 'item', ref: 'speaker_tower', tier: 3, title: 'Torre de sonido y subwoofer', text: 'Mejoran el sonido de tu club, igual que los altavoces y la cabina.', where: 'Tienda › DJ y sonido · nivel 12 y 20' },
+      { kind: 'item', ref: 'led_wall', tier: 4, title: 'Pared LED', text: 'Una pared de luz que late con la música.', where: 'Tienda › Luces · nivel 22' },
+      { kind: 'item', ref: 'strobe', tier: 3, title: 'Luz estroboscópica y máquina de humo', text: 'Para que la pista se sienta como una noche de verdad.', where: 'Tienda › Luces · nivel 11 y 15' },
+      { kind: 'item', ref: 'gold_record', tier: 4, title: 'Disco de oro y muro de premios', text: 'Presume tus logros: suben el lujo y se pueden robar, así que cuídalos.', where: 'Tienda › Trofeos · nivel 14 y 31' },
+      { kind: 'item', ref: 'sculpture', tier: 4, title: 'Escultura de neón', text: 'Una cinta de luz que gira sobre su pedestal.', where: 'Tienda › Decoración · nivel 26' },
+      { kind: 'item', ref: 'floor_led', tier: 4, title: 'Baldosa dorada y pista LED', text: 'Dos pistas de baile nuevas para tu pista.', where: 'Tienda › Pistas · nivel 20 y 28' },
+    ],
+  },
+  {
+    id: '2026-11-24',
+    date: '24 de noviembre de 2026',
+    title: 'La noche se pone seria',
+    intro: 'Llegan los shows, la seguridad, la policía y una cara nueva para todo el juego.',
+    entries: [
+      { kind: 'item', ref: 'dance_cage', tier: 4, title: 'La jaula de baile', text: 'Una bailarina en una caja de cristal: atrae gente y deja propinas. Mejórala y gana mucho más.', where: 'Tienda › Shows · nivel 14' },
+      { kind: 'item', ref: 'safe', tier: 1, title: 'Alarma, caja fuerte y vitrina blindada', text: 'Ya pueden asaltarte, incluso cuando no estás. Protege tus piezas y tu caja.', where: 'Tienda › Seguridad · nivel 10' },
+      { kind: 'icon', ref: 'street', title: 'Asaltos y policía', text: 'Asalta a otros clubes con el equipo de Zeta. La Brigada del Ruido busca lo robado y puede clausurar tu club.', where: 'Toca el club de un vecino · nivel 10' },
+      { kind: 'icon', ref: 'music', title: 'Canciones del juego', text: 'Ocho canciones listas para poner, y todos oyen lo mismo cuando visitas un club.', where: 'Música' },
+      { kind: 'icon', ref: 'missions', title: 'Misiones con más experiencia', text: 'Cada misión da cinco veces más XP: subir de nivel es mucho más rápido.', where: 'Misiones' },
+      { kind: 'icon', ref: 'shop', title: 'Todo más barato', text: 'Los precios de la tienda, la oficina y las ampliaciones bajaron a menos de la mitad.', where: 'Tienda y Oficina' },
+      { kind: 'icon', ref: 'star', title: 'Una cara nueva y una guía', text: 'Rediseñamos todas las pantallas. Ahora el juego te explica cada cosa cuando la necesitas.', where: 'Menú › Guía del juego' },
+    ],
+  },
+];
+
+export const LATEST_NEWS = NEWS[0].id;
+export const newsById = (id: string): News | undefined => NEWS.find((n) => n.id === id);

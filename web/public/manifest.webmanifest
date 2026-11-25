@@ -1,0 +1,9 @@
+{
+  "name": "Nightclub Reborn",
+  "short_name": "Nightclub",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1030",
+  "theme_color": "#0b1030"
+}
