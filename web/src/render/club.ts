@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BOOTH_IDS, BY_ID, type ItemDef } from '../core/catalog';
 import {
   PARCEL, PHASES, YARD, blockedSet, buyItem, doorCells, setOpen as setClubOpen, footprint, levelNow, newClub, owned, phaseOf, placeItem, removeItem, sellFromInventory,
-  sellValue, setPhase, stashItem, validatePlacement, type ClubState, type PlaceMode, type PlacedItem, type Rot,
+  sellKept, sellValue, setPhase, stashItem, validatePlacement, type ClubState, type PlaceMode, type PlacedItem, type Rot,
 } from '../core/club';
 import { applyEvents } from '../core/game';
 import { GuestSim, VIP_CHECK_COST, type GuestEvent, type Vip } from '../core/guests';
@@ -63,7 +63,7 @@ export type ViewMode = 'inside' | 'outside';
 
 export type Tool =
   | { kind: 'select' }
-  | { kind: 'place'; defId: string; rot: Rot; mode: PlaceMode; moveFrom?: PlacedItem; fromLoot?: string };
+  | { kind: 'place'; defId: string; rot: Rot; mode: PlaceMode; moveFrom?: PlacedItem; fromLoot?: string; fromKept?: string };
 
 /** What the game UI wants to hear about. The view never touches the UI directly. */
 export interface ClubHooks {
@@ -1122,6 +1122,28 @@ export class ClubView {
     this.afterToolChange();
   }
 
+  /** Start putting an improved piece that was put away back into the club: it keeps its version. */
+  startPlaceKept(uid: string): void {
+    const k = this.state.kept.find((x) => x.uid === uid);
+    if (!k) return;
+    this.goInsideNow();
+    this.cancelTool(false);
+    this.selectedUid = null;
+    const moveFrom = { uid: k.uid, id: k.id, x: 0, y: 0, rot: 0 as Rot, tier: k.tier } as PlacedItem;
+    this.tool = { kind: 'place', defId: k.id, rot: 0, mode: 'free', moveFrom, fromKept: k.uid };
+    this.message = '';
+    this.afterToolChange();
+  }
+
+  /** Sell an improved piece that is kept away. */
+  sellKeptPiece(uid: string): void {
+    const k = this.state.kept.find((x) => x.uid === uid);
+    const res = sellKept(this.state, uid);
+    if (res.error) return this.say(res.error);
+    this.commit(res.state, false);
+    if (k) this.say(`${BY_ID.get(k.id)!.name} vendido`);
+  }
+
   /** the copy of the game on the server (set by main) */
   cloud: import('../net/cloud').Cloud | null = null;
 
@@ -2014,6 +2036,7 @@ export class ClubView {
       const hot = t.moveFrom.hot && t.moveFrom.hot > Date.now() ? t.moveFrom.hot : undefined;
       let placed = moved > 1 || hot ? { ...res.state, items: res.state.items.map((i, k) => (k === last ? { ...i, ...(moved > 1 ? { tier: moved } : {}), ...(hot ? { hot } : {}) } : i)) } : res.state;
       if (t.fromLoot) placed = { ...placed, loot: placed.loot.filter((l) => l.uid !== t.fromLoot) }; // it left the bag
+      if (t.fromKept) placed = { ...placed, kept: placed.kept.filter((k) => k.uid !== t.fromKept) }; // and this one left the stash
       this.selectedUid = placed.items[last].uid;
       this.setState(placed);
       this.afterToolChange();

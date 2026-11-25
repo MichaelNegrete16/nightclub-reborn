@@ -65,7 +65,7 @@ Robar no es gratis ni instantáneo. Hay que **prepararse**.
 
 ### Requisitos para intentarlo
 - **Nivel 10 o más** (hasta ahí, nadie te roba y tú no robas: protección de novato).
-- **Un objetivo de nivel parecido** (±5 niveles).
+- **Sin límite de diferencia de nivel**: desde el nivel 10 se puede asaltar a cualquiera; cada club decide cuánto se protege.
 - **Un Kit de Robo** de la tienda de Zeta, que se consume en el intento:
 
 | Kit | Para qué sirve | Precio |

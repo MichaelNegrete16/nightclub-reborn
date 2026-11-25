@@ -455,7 +455,7 @@ export class GameUi {
     openBtn.classList.toggle('ready', !s.open && canOpen(s).ok);
     const label = openBtn.querySelector('span');
     if (label) label.textContent = s.open ? 'Cerrar club' : 'Abrir club';
-    const invCount = Object.values(s.inventory).reduce((a, n) => a + n, 0);
+    const invCount = Object.values(s.inventory).reduce((a, n) => a + n, 0) + s.kept.length;
     this.setBadge('inventory', invCount);
     // tutorial pointer: after something is bought, the inventory is where to go; otherwise the shop
     const needsPlacing = missions[0] && ['placed', 'tiles', 'seats', 'luxury'].includes(missions[0].mission.goal.kind);

@@ -1,9 +1,10 @@
 // The four versions of every object (pure logic). Run: node --experimental-strip-types scripts/tiers-test.mjs
 import assert from 'node:assert/strict';
-import { newClub, placeItem, upgradeItem, stashItem, removeItem, sellValue, statsOf, soundSystem, tierOfItem, sanitizeClub } from '../src/core/club.ts';
+import { newClub, placeItem, upgradeItem, stashItem, sellKept, removeItem, sellValue, statsOf, soundSystem, tierOfItem, sanitizeClub } from '../src/core/club.ts';
 import { BY_ID, CATALOG } from '../src/core/catalog.ts';
 import { TIER_COST, TIER_LEVEL, TIER_LUXURY, upgradeCost, invested, soundQuality } from '../src/core/tiers.ts';
 import { GuestSim } from '../src/core/guests.ts';
+import { assetValue } from '../src/core/ledger.ts';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
@@ -28,7 +29,7 @@ test('upgrading costs more each time, needs the level, and pays only once per st
   assert.match(upgradeItem(broke, broke.items[0].uid).error, /monedas/);
 });
 
-test('better versions give more luxury; selling returns half of everything paid; an improved piece cannot be stashed', () => {
+test('better versions give more luxury; selling returns half of everything paid; an improved piece is stashed with its version', () => {
   let s = put({ ...rich(), phase: 3 }, 'speaker', 1, 1);
   const base = statsOf(s).luxury;
   const uid = s.items[0].uid;
@@ -38,7 +39,19 @@ test('better versions give more luxury; selling returns half of everything paid;
   const def = BY_ID.get('speaker');
   assert.equal(sellValue(def, 3), Math.floor(invested(def.price, 3) / 2));
   assert.ok(sellValue(def, 3) > sellValue(def, 1) * 3);
-  assert.match(stashItem(s, uid).error, /no se guarda/);
+  // stashing keeps the version: nothing is lost, it comes back as it was, and it can be sold at its value
+  const away = stashItem(s, uid);
+  assert.equal(away.error, undefined);
+  assert.equal(away.state.items.length, 0);
+  assert.equal(away.state.kept.length, 1);
+  assert.equal(away.state.kept[0].tier, 3);
+  assert.equal(Object.keys(away.state.inventory).includes('speaker'), false, 'it does not go to the plain inventory');
+  assert.equal(assetValue(away.state), assetValue(s), 'its value still counts');
+  const back = sanitizeClub(JSON.parse(JSON.stringify(away.state)));
+  assert.deepEqual(back.kept, away.state.kept, 'it survives saving and loading');
+  const soldKept = sellKept(away.state, away.state.kept[0].uid);
+  assert.equal(soldKept.state.coins - s.coins, sellValue(def, 3));
+  assert.equal(soldKept.state.kept.length, 0);
   const sold = removeItem(s, uid);
   assert.equal(sold.state.coins - s.coins, sellValue(def, 3));
   assert.equal(stashItem(put(rich(), 'plant', 1, 1), 'i1').error, undefined, 'a basic piece still goes to the inventory');

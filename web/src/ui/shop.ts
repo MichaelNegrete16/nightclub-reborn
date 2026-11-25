@@ -46,7 +46,7 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
   };
 
   const sig = () =>
-    JSON.stringify([category, selected, levelNow(club.state), club.state.inventory, mode === 'shop' ? 0 : 1]);
+    JSON.stringify([category, selected, levelNow(club.state), club.state.inventory, club.state.kept, mode === 'shop' ? 0 : 1]);
 
   function renderCats(): void {
     cats.replaceChildren();
@@ -71,7 +71,8 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
   function renderGrid(): void {
     grid.replaceChildren();
     const items = visible();
-    if (items.length === 0) {
+    const kept = mode === 'inventory' ? club.state.kept.filter((k) => category === 'all' || BY_ID.get(k.id)?.category === category) : [];
+    if (items.length === 0 && kept.length === 0) {
       const empty = el('div', 'empty');
       empty.append(el('p', '', mode === 'inventory' ? 'Tu inventario está vacío.' : 'Nada en esta categoría.'));
       if (mode === 'inventory') {
@@ -110,6 +111,31 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
         card.append(lock);
       }
       grid.append(card);
+    }
+    if (kept.length) {
+      // improved pieces that were put away: each keeps its version
+      grid.append(el('h3', 'kept-title', 'Piezas mejoradas guardadas'));
+      for (const k of kept) {
+        const def = BY_ID.get(k.id);
+        if (!def) continue;
+        const row = el('div', 'kept-row');
+        const img = el('img') as HTMLImageElement;
+        img.src = ctx.thumbs.item(def.id, k.tier);
+        img.alt = def.name;
+        img.draggable = false;
+        const text = el('div', 'kept-text');
+        text.append(el('b', '', `${def.name} · ${TIER_NAMES[k.tier - 1]}`), el('span', '', '★'.repeat(k.tier) + '☆'.repeat(4 - k.tier)));
+        const place = button('Colocar', 'btn primary', () => {
+          modal.close();
+          club.startPlaceKept(k.uid);
+        });
+        const sell = button(`Vender +${fmt(sellValue(def, k.tier))}`, 'btn danger', () => {
+          club.sellKeptPiece(k.uid);
+          render(true);
+        });
+        row.append(img, text, place, sell);
+        grid.append(row);
+      }
     }
   }
 

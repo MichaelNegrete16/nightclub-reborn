@@ -24,6 +24,10 @@ export function assetValue(s: ClubState): number {
     if (def) total += invested(def.price, tierOfItem(it));
   }
   for (const [id, n] of Object.entries(s.inventory)) total += (BY_ID.get(id)?.price ?? 0) * n;
+  for (const k of s.kept ?? []) {
+    const def = BY_ID.get(k.id);
+    if (def) total += invested(def.price, k.tier);
+  }
   for (const l of s.loot) {
     const def = BY_ID.get(l.id);
     if (def) total += invested(def.price, tierOfItem(l));

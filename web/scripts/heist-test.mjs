@@ -16,13 +16,13 @@ const sec = { guards: 0, alarm: false, crowded: false, locks: 0 };
 const statue = { uid: 'i1', id: 'gold_statue', tier: 1 };
 const bar = { uid: 'i2', id: 'bar_straight', tier: 4 };
 
-test('novices, big level gaps and robbing yourself are refused; the shield, cooldowns and daily cap hold', () => {
+test('novices and robbing yourself are refused (any level can rob any level from level 10); the shield, cooldowns and daily cap hold', () => {
   const t = party(1);
   assert.equal(whyNot(t, party(1), NORMAL).reason, 'self');
   assert.equal(whyNot(party(1, 9), party(2), NORMAL).reason, 'novice');
   assert.equal(whyNot(t, party(2, 9), NORMAL).reason, 'novice');
-  assert.equal(whyNot(t, party(2, 26), NORMAL).reason, 'band');
-  assert.equal(whyNot(t, party(2, 25), NORMAL), null, 'five levels apart is fine');
+  assert.equal(whyNot(t, party(2, 60), NORMAL), null, 'the level gap does not matter: from level 10 anyone can be robbed');
+  assert.equal(whyNot(party(1, 80), party(2, 12), NORMAL), null);
   assert.equal(whyNot(t, party(2, 20, { ...newCrime(), shieldUntil: NORMAL + H }), NORMAL).reason, 'shield');
   assert.equal(whyNot(party(1, 20, { ...newCrime(), lastHeistAt: NORMAL - H }), party(2), NORMAL).reason, 'cooldown');
   assert.equal(whyNot(party(1, 20, { ...newCrime(), lastHeistAt: NORMAL - 4 * H }), party(2), NORMAL), null);

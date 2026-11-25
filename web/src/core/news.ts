@@ -24,6 +24,27 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25q',
+    date: '25 de noviembre de 2026',
+    title: 'Robos sin límite de nivel',
+    intro: 'Desde el nivel 10 puedes asaltar a cualquier club, sin importar su nivel.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Ya no hay rango de niveles', text: 'Se quitó la regla de «solo a 5 niveles de diferencia». Desde el nivel 10 todos pueden robar y ser robados; protegerse depende de tu alarma, caja fuerte, cámaras, vitrina blindada y protector antirrobos.', where: 'Ciudad › tarjeta de un club › Asaltar' },
+    ],
+  },
+  {
+    id: '2026-11-25p',
+    date: '25 de noviembre de 2026',
+    title: 'Más de 80 misiones nuevas, piezas mejoradas que se guardan y aviso del DJ',
+    intro: 'Ya no te quedas sin qué hacer entre el nivel 17 y el 100.',
+    entries: [
+      { kind: 'icon', ref: 'missions', title: 'El hueco del nivel 19 al 23', text: 'Faltaban misiones en esa parte. Ahora el capítulo 4 abre en el nivel 17 y trae una por cada objeto nuevo que se desbloquea: luces móviles, tótem LED, subwoofer, sofá VIP, pared LED, estatua dorada, cabina profesional y más.', where: 'Misiones' },
+      { kind: 'icon', ref: 'music', title: 'El DJ te avisa', text: 'Los navegadores no dejan sonar nada hasta que tocas la página. Ahora, si recargas y la música aún no suena, aparece «Tu DJ está listo: toca la pantalla». Un toque en cualquier parte y empieza.', where: 'Al abrir o recargar el juego' },
+      { kind: 'icon', ref: 'stash', title: 'Guarda tus piezas mejoradas', text: 'Ya puedes guardar un objeto mejorado: se queda con su versión (Premium, Élite…) y no pierdes lo que pagaste. Aparece en el Inventario, en «Piezas mejoradas guardadas», para colocarlo otra vez o venderlo por lo que vale.', where: 'Seleccionar objeto › Guardar · Inventario' },
+      { kind: 'icon', ref: 'star', title: 'Capítulos 5, 6 y 7', text: 'Del nivel 36 al 100 hay metas de invitados, tragos, bailes, famosos, asaltos, objetos Élite, sonido, fachada, reformas y ampliaciones, con recompensas que crecen hasta un millón de monedas por la última.', where: 'Misiones' },
+    ],
+  },
+  {
     id: '2026-11-25o',
     date: '25 de noviembre de 2026',
     title: 'Ganas el doble y misiones arregladas',

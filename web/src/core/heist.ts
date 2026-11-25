@@ -11,8 +11,6 @@ const H = 3_600_000;
 export const RULES = {
   /** nobody below this level can rob or be robbed */
   noviceLevel: 10,
-  /** how far apart in level two players can be */
-  levelBand: 5,
   /** between two robberies by the same player */
   ownCooldown: 3 * H,
   /** the same target again */
@@ -132,7 +130,7 @@ export interface Party {
   crime: Crime;
 }
 
-export type Reason = 'novice' | 'band' | 'self' | 'cooldown' | 'sameTarget' | 'shield' | 'guard' | 'detained' | 'dailyCap' | 'closed';
+export type Reason = 'novice' | 'self' | 'cooldown' | 'sameTarget' | 'shield' | 'guard' | 'detained' | 'dailyCap' | 'closed';
 
 const dayOf = (now: number) => Math.floor((now - 5 * H) / (24 * H));
 
@@ -140,7 +138,6 @@ const dayOf = (now: number) => Math.floor((now - 5 * H) / (24 * H));
 export function whyNot(thief: Party, victim: Party, now: number): { reason: Reason; until?: number } | null {
   if (thief.n === victim.n) return { reason: 'self' };
   if (thief.level < RULES.noviceLevel || victim.level < RULES.noviceLevel) return { reason: 'novice' };
-  if (Math.abs(thief.level - victim.level) > RULES.levelBand) return { reason: 'band' };
   if (thief.crime.detainedUntil > now) return { reason: 'detained', until: thief.crime.detainedUntil };
   const revenge = (thief.crime.revenge[String(victim.n)] ?? 0) > now;
   const wait = revenge ? RULES.revengeCooldown : RULES.ownCooldown;

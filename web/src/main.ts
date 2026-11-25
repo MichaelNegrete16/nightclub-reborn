@@ -347,8 +347,16 @@ async function main() {
     net.start();
   }
   // browsers only allow sound after a click or tap
-  window.addEventListener('pointerdown', () => club.music.unlock(), { capture: true });
-  window.addEventListener('keydown', () => club.music.unlock(), { capture: true });
+  for (const ev of ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown']) window.addEventListener(ev, () => club.music.unlock(), { capture: true });
+  // the DJ is ready but the browser keeps the sound off until the player touches the page: say so, and make one tap enough
+  const soundHint = document.createElement('div');
+  soundHint.className = 'sound-hint';
+  soundHint.textContent = '🎧 Tu DJ está listo: toca la pantalla para que empiece la música';
+  soundHint.hidden = true;
+  stageEl.append(soundHint);
+  window.setInterval(() => {
+    soundHint.hidden = club.music.unlocked || !club.state.music.playing || !!document.querySelector('.onboarding');
+  }, 400);
   try {
     const raw = localStorage.getItem('nc.env.v1');
     if (raw) club.env.apply(JSON.parse(raw));

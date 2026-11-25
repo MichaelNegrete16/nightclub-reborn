@@ -18,7 +18,6 @@ export interface HeistApi {
 const REASON: Record<string, string> = {
   self: 'Ese eres tú.',
   novice: `Hasta el nivel ${RULES.noviceLevel} nadie puede asaltar ni ser asaltado.`,
-  band: `Solo puedes asaltar a quien esté a ${RULES.levelBand} niveles de ti o menos.`,
   cooldown: 'Todavía estás descansando del último robo.',
   sameTarget: 'Ya asaltaste a este club hace poco.',
   shield: 'Este club acaba de ser asaltado: está protegido un rato.',

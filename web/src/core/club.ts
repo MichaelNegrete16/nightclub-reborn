@@ -118,6 +118,8 @@ export interface ClubState {
   kits: Record<Kit, number>;
   /** stolen pieces in the bag, still "hot" */
   loot: LootPiece[];
+  /** improved pieces taken out of the room and kept, with their version */
+  kept: KeptPiece[];
   /** the last letters about robberies and police visits (newest first) */
   reports: Report[];
   /** what the guests said about the club when they left (newest first) */
@@ -147,6 +149,15 @@ export interface LootPiece {
   from: number;
 }
 
+/** an improved piece put away: it keeps its version (and what was paid for it) until it is placed again or sold */
+export interface KeptPiece {
+  uid: string;
+  id: string;
+  tier: Tier;
+}
+
+export const MAX_KEPT = 60;
+
 export const START_COINS = 4000 * PRICE_SCALE;
 export const SELL_RATIO = 0.5;
 /** the late uncle's booth: a gift in the inventory at the very start of the story */
@@ -171,6 +182,7 @@ export function newClub(): ClubState {
     decor: newDecor(),
     kits: { picks: 0, jammer: 0, van: 0, disguise: 0 },
     loot: [],
+    kept: [],
     reports: [],
     reviews: [],
   };
@@ -415,9 +427,20 @@ export function stashItem(state: ClubState, uid: string, now = Date.now()): Resu
     if (state.loot.length >= 20) return { state, error: 'Tu bolsa está llena (20 piezas).' };
     return { state: { ...state, items, loot: [...state.loot, { uid: it.uid, id: it.id, tier: tierOfItem(it), hotUntil: it.hot!, from: -1 }] } };
   }
-  // the inventory only keeps basic pieces: an improved one would lose what was paid for it
-  if (tierOfItem(it) > 1) return { state, error: 'Una pieza mejorada no se guarda: puedes moverla o venderla.' };
+  // an improved piece is kept with its version: what was paid for the upgrades is not lost
+  if (tierOfItem(it) > 1) {
+    if (state.kept.length >= MAX_KEPT) return { state, error: `Ya guardaste ${MAX_KEPT} piezas mejoradas: coloca o vende alguna.` };
+    return { state: { ...state, items, kept: [...state.kept, { uid: it.uid, id: it.id, tier: tierOfItem(it) }] } };
+  }
   return { state: { ...state, items, inventory: withInventory(state, it.id, 1) } };
+}
+
+/** Sell a kept (improved) piece for what a piece of that version is worth. */
+export function sellKept(state: ClubState, uid: string): Result {
+  const k = state.kept.find((x) => x.uid === uid);
+  const def = k && BY_ID.get(k.id);
+  if (!k || !def) return { state, error: 'No existe' };
+  return { state: { ...state, coins: state.coins + sellValue(def, k.tier), kept: state.kept.filter((x) => x.uid !== uid) } };
 }
 
 /** Sell an object from the room. `refund` false is used internally while picking something up to move it. */
@@ -512,6 +535,7 @@ export function sanitizeClub(raw: unknown): ClubState {
       van: Math.min(nat(r.kits?.van, 0), 1),
       disguise: Math.min(nat(r.kits?.disguise, 0), 99),
     },
+    kept: (Array.isArray(r.kept) ? r.kept : []).slice(0, MAX_KEPT).filter((k) => k && typeof k.uid === 'string' && typeof k.id === 'string' && BY_ID.has(k.id)).map((k) => ({ uid: k.uid.slice(0, 30), id: k.id, tier: clampTier(k.tier) })),
     loot: (Array.isArray(r.loot) ? r.loot : []).slice(0, 20).filter((l) => l && typeof l.uid === 'string' && typeof l.id === 'string' && BY_ID.has(l.id)).map((l) => ({ uid: l.uid.slice(0, 30), id: l.id, tier: clampTier(l.tier), hotUntil: Number.isFinite(l.hotUntil) ? Math.max(0, l.hotUntil) : 0, from: Number.isInteger(l.from) ? l.from : -1 })),
     reports: (Array.isArray(r.reports) ? r.reports : []).slice(0, 12).filter((x) => x && typeof x.id === 'string' && ['robbed', 'loot', 'police', 'income', 'fee', 'jail', 'refund'].includes(x.kind)).map((x) => ({
       id: x.id.slice(0, 40), at: nat(x.at, 0), kind: x.kind, by: Number.isInteger(x.by) ? x.by : -1, byName: typeof x.byName === 'string' ? x.byName.slice(0, 20) : '',

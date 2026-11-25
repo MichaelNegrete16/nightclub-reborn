@@ -33,7 +33,8 @@ export class SaveStore {
     const row = this.#db.prepare('SELECT at, meta, state FROM saves WHERE pid = ?').get(id);
     if (!row) return null;
     try {
-      return { at: row.at, meta: JSON.parse(row.meta), state: JSON.parse(row.state) };
+      // cleaned on the way out: a game stored before a field existed comes back with that field filled in
+      return { at: row.at, meta: JSON.parse(row.meta), state: sanitizeClub(JSON.parse(row.state)) };
     } catch {
       return null;
     }
