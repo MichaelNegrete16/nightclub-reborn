@@ -1,4 +1,5 @@
 import type { CharacterConfig } from '../core/character';
+import { getToken } from './session';
 import type { PlacedItem } from '../core/club';
 import type { Genre } from '../core/music';
 import { cleanMail, type Mail } from '../core/mail';
@@ -199,6 +200,10 @@ export class Online {
   onGuard: (r: { ok: boolean; error?: string; price: number; until: number }) => void = () => {};
   /** the city's clock: milliseconds since 1970, from the server */
   onClock: (serverNow: number, build: string) => void = () => {};
+  /** this club has an account and this browser has no valid session: ask for the passkey */
+  onAuth: () => void = () => {};
+  /** the game was opened on another device: this one stops */
+  onElsewhere: () => void = () => {};
 
   private ws: WebSocket | null = null;
   private retry = 0;
@@ -249,7 +254,7 @@ export class Online {
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
-      ws.send(JSON.stringify({ t: 'hello', id: this.id, name: this.name() }));
+      ws.send(JSON.stringify({ t: 'hello', id: this.id, name: this.name(), token: getToken() || undefined }));
       if (this.away) ws.send(JSON.stringify({ t: 'away', away: true })); // opened while hidden
       this.lastSent = '';
       this.lastLook = '';
@@ -274,6 +279,7 @@ export class Online {
         else if (m.t === 'chore') this.onChore({ ok: m.ok === true, error: typeof m.error === 'string' ? m.error : undefined, done: Number(m.done) || 0, goal: Number(m.goal) || 0, released: m.released === true });
         else if (m.t === 'club') this.onVisit(m as VisitView);
         else if (m.t === 'clock') this.onClock(Number(m.now), String(m.build ?? ''));
+        else if (m.t === 'auth') this.onAuth();
         else if (m.t === 'city') {
           this.online = m.online ?? 0;
           this.set('online');
@@ -286,7 +292,8 @@ export class Online {
     ws.onclose = (e) => {
       this.ws = null;
       this.set('off');
-      if (e.code !== 4000) this.again(); // 4000: this player opened the game somewhere else
+      if (e.code === 4000) this.onElsewhere(); // 4000: this player opened the game somewhere else
+      else if (e.code !== 4003) this.again(); // 4003: the club belongs to an account: it waits for the login
     };
     ws.onerror = () => ws.close();
   }

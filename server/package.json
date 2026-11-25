@@ -10,6 +10,7 @@
     "load": "node --experimental-strip-types loadtest.mjs"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^14.1.0",
     "ws": "^8.18.0"
   }
 }

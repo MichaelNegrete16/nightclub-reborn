@@ -550,3 +550,11 @@ body.in-prison .bottombar, body.in-prison .view-controls, body.in-prison .contex
   .vip-card .vip-photo { width: 80px; height: 90px; }
   .star-splash img { width: 140px; height: 158px; }
 }
+
+/* ---- account window ---- */
+.modal.account .acc-msg { min-height: 1.2em; margin: 8px 0 0; font-weight: 700; color: #3ddc97; }
+.modal.account .acc-msg.bad { color: #ff4f6a; }
+.modal.account .acc-code { font-family: Bungee, monospace; font-size: 18px; text-align: center; letter-spacing: 1px; }
+.modal.account .acc-link { font-family: Bungee, monospace; font-size: 30px; text-align: center; letter-spacing: 4px; color: #f5b91d; margin: 8px 0 0; }
+.modal.account .acc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #ffffff1a; }
+.modal.account .menu-sec .btn { margin: 4px 6px 4px 0; }

@@ -3,6 +3,7 @@ import { WEATHER_LABEL, type EnvSetting, type Weather } from '../render/environm
 import { openModal } from './modal';
 import { openGuide } from './guide';
 import { openNews } from './news';
+import { openAccount } from './account';
 import { getPreference, setPreference, type Preference } from '../render/quality';
 import { describe as describeSave } from '../net/cloud';
 import type { Ctx } from './shop';
@@ -69,6 +70,15 @@ export function openMenu(deps: MenuDeps): void {
     }),
   );
   game.append(el('p', 'sub', 'Tu partida se guarda sola en este navegador.'));
+
+  const accountSec = sec('Cuenta');
+  accountSec.append(
+    el('p', 'sub', 'Protege tu club con una passkey y juega con tu progreso desde el celular y el computador.'),
+    button('Mi cuenta', 'btn primary', () => {
+      modal.close();
+      openAccount(deps.ctx);
+    }),
+  );
 
   // the copy of the game on the server, and the recovery code
   const cloudSec = sec('Partida en la nube');

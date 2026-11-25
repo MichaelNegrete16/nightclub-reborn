@@ -24,9 +24,11 @@ export class World {
 
   constructor(file) {
     this.#file = file;
-    if (file && fs.existsSync(file)) {
+    // `file`: a path to a JSON file, or a store with load() and save(obj) (the city database)
+    const stored = typeof file === 'object' && file ? file.load() : file && fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+    if (stored) {
       try {
-        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const raw = stored;
         for (const [id, p] of Object.entries(raw.players ?? {})) {
           if (!validId(id) || !Number.isInteger(p.n) || p.n < 0) continue;
           this.#add(id, p.n, cleanClub(p.club), Number(p.lastSeen) || 0);
@@ -235,6 +237,7 @@ export class World {
   save() {
     if (!this.#file) return;
     const out = { nextLot: this.nextLot, players: Object.fromEntries([...this.players].map(([id, p]) => [id, { n: p.n, club: p.club, lastSeen: p.lastSeen, look: p.look, items: p.items, crime: p.crime, mail: p.mail, away: p.away }])) };
+    if (typeof this.#file === 'object') return void this.#file.save(out);
     fs.mkdirSync(path.dirname(this.#file), { recursive: true });
     const tmp = `${this.#file}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(out));

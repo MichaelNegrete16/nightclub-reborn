@@ -286,10 +286,10 @@ await test('saved games: exact copy, cleaned, backed up, and a wipe can never re
   const wipe = await post(pid, { xp: 0, story: { intro: false } });
   assert.equal(wipe.status, 409);
   assert.equal((await (await fetch(`${base}/save?pid=${pid}`)).json()).meta.xp, 50050, 'the good copy is still there');
-  assert.ok(fs.existsSync(path.join(dir, `${pid}.suspect.json`)), 'and the wipe is kept apart');
+  assert.ok(s.db.prepare('SELECT 1 FROM save_suspects WHERE pid = ?').get(pid), 'and the wipe is kept apart');
   assert.equal((await post(pid, { xp: 0, story: { intro: false } }, '&force=1')).status, 200, 'starting over on purpose is allowed');
   assert.equal((await (await fetch(`${base}/save?pid=${pid}`)).json()).meta.xp, 0);
-  assert.ok(fs.readdirSync(dir).some((f) => f.startsWith(`${pid}.bak.`)), 'the earlier game was kept as a backup');
+  assert.ok(s.saves.backups(pid).length > 0, 'the earlier game was kept as a backup');
   c.ws.close();
   await s.close();
 });
@@ -722,6 +722,174 @@ await test('a prison that should not have been (a robbery nobody saw) is undone:
   assert.equal(s.saves.read(P).state.coins, 9000 + 450);
   assert.equal(letters[0].kind, 'refund');
   c.ws.close();
+  await s.close();
+});
+
+await test('a police visit that finds stolen goods while shutting the club is an arrest: prison, chores, and the scene in the letter', async () => {
+  const s = await createServer({ port: 0, dataFile: null, audioDir: null, saveEveryMs: 0 });
+  const base = `http://127.0.0.1:${s.port}`;
+  const P = 'player-arrest-0001';
+  const c = client(s.port, P, 'Escondido');
+  await c.ready;
+  const NOW = Date.UTC(2026, 10, 28, 15, 0, 0);
+  let g = { ...newClub(), xp: 600000, coins: 100000, phase: 4 };
+  g = placeItem(g, 'gold_statue', 2, 2, 0, 'free').state;
+  const uid = g.items.find((i) => i.id === 'gold_statue').uid;
+  g = { ...g, open: true, items: g.items.map((i) => (i.uid === uid ? { ...i, hot: NOW + 72 * 3600_000 } : i)) };
+  await fetch(`${base}/save?pid=${P}`, { method: 'POST', body: JSON.stringify(g) });
+  const letters = [];
+  const deliver = (id, l) => { letters.push(l); s.deliver(id, l); };
+  patrolTick(s.world, s.saves, deliver, NOW); // starts the clock
+  s.world.setCrime(P, { ...s.world.crimeOf(P), heat: 70, heatAt: NOW, patrolAt: 0 }); // "closure" level with a hot piece on show
+  const v = patrolTick(s.world, s.saves, deliver, NOW + 60_000);
+  assert.equal(v.length, 1);
+  const crime = s.world.crimeOf(P);
+  assert.ok(v[0].closedUntil > 0 && v[0].seized === 1);
+  assert.equal(crime.detainedUntil, crime.closedUntil, 'the owner is in prison for as long as the club is shut');
+  assert.ok(crime.choreGoal > 0 && crime.chores === 0, 'with chores to do to get out');
+  assert.equal(letters[0].story, 'raid');
+  assert.equal(letters[0].chores, crime.choreGoal);
+  c.ws.close();
+  await s.close();
+});
+
+await test('the database: the old JSON files move in once, nothing is lost, and the copy is exact', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nc-import-'));
+  const savesDir = path.join(dir, 'saves');
+  fs.mkdirSync(savesDir);
+  const game = sanitizeClub({ ...newClub(), xp: 7000, coins: 4242, phase: 2 });
+  const rec = { at: 1_700_000_000_000, meta: { level: 5, phase: 2, coins: 4242, xp: 7000 }, state: game };
+  fs.writeFileSync(path.join(savesDir, 'player-old-00001.json'), JSON.stringify(rec));
+  fs.writeFileSync(path.join(savesDir, 'player-old-00001.bak.1699999999999.json'), JSON.stringify({ ...rec, at: 1_699_999_999_999 }));
+  const worldFile = path.join(dir, 'world.json');
+  fs.writeFileSync(worldFile, JSON.stringify({ nextLot: 1, players: { 'player-old-00001': { n: 0, club: { name: 'Viejo' }, lastSeen: 1 } } }));
+  const { openDb, importLegacy, worldStore } = await import('./db.mjs');
+  const { SaveStore } = await import('./saves.mjs');
+  const db = openDb(path.join(dir, 'nightclub.db'));
+  const first = importLegacy(db, { worldFile, savesDir });
+  assert.deepEqual(first, { world: true, saves: 1, backups: 1 });
+  assert.deepEqual(importLegacy(db, { worldFile, savesDir }), { world: false, saves: 0, backups: 0 }, 'a second run imports nothing');
+  const store = new SaveStore(db);
+  assert.equal(store.read('player-old-00001').state.coins, 4242);
+  assert.equal(store.read('player-old-00001').meta.xp, 7000);
+  assert.equal(store.backups('player-old-00001')[0].at, 1_699_999_999_999);
+  assert.equal(worldStore(db).load().players['player-old-00001'].club.name, 'Viejo');
+  assert.ok(fs.existsSync(path.join(savesDir, 'player-old-00001.json')), 'the files stay as a backup');
+  // a file copy of the live database is a complete database
+  const { backupDb } = await import('./db.mjs');
+  const copy = path.join(dir, 'copy', 'n.db');
+  backupDb(db, copy);
+  assert.equal(new SaveStore(openDb(copy)).read('player-old-00001').state.coins, 4242);
+  db.close();
+});
+
+await test('accounts: a passkey protects a club, other devices join with a code, and a recovery code is the way back', async () => {
+  const crypto = await import('node:crypto');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nc-auth-'));
+  const s = await createServer({ port: 0, dataFile: null, audioDir: null, savesDir: dir, saveEveryMs: 0, authOrigins: ['http://localhost:5173'] });
+  const base = `http://127.0.0.1:${s.port}`;
+  const ORIGIN = 'http://localhost:5173';
+  const P = 'player-account-01';
+  const c = client(s.port, P, 'Cuentas');
+  await c.ready;
+  await c.waitCity();
+  const call = async (step, body = {}, token, origin = ORIGIN) => {
+    const r = await fetch(`${base}/auth/${step}`, { method: 'POST', headers: { 'content-type': 'application/json', origin, ...(token ? { 'x-nc-token': token } : {}) }, body: JSON.stringify(body) });
+    return { status: r.status, ...(await r.json()) };
+  };
+
+  // --- a tiny software authenticator (ES256, no attestation), like the one in a phone ---
+  const b64 = (b) => Buffer.from(b).toString('base64url');
+  const cbor = (v) => {
+    const head = (major, n) => (n < 24 ? Buffer.from([(major << 5) | n]) : n < 256 ? Buffer.from([(major << 5) | 24, n]) : Buffer.from([(major << 5) | 25, n >> 8, n & 255]));
+    if (Buffer.isBuffer(v)) return Buffer.concat([head(2, v.length), v]);
+    if (typeof v === 'string') { const b = Buffer.from(v); return Buffer.concat([head(3, b.length), b]); }
+    if (typeof v === 'number') return v >= 0 ? head(0, v) : head(1, -1 - v);
+    const entries = v instanceof Map ? [...v] : Object.entries(v);
+    return Buffer.concat([head(5, entries.length), ...entries.flatMap(([k, x]) => [cbor(k), cbor(x)])]);
+  };
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const jwk = publicKey.export({ format: 'jwk' });
+  const credId = crypto.randomBytes(32);
+  const rpHash = crypto.createHash('sha256').update('localhost').digest();
+  const cose = cbor(new Map([[1, 2], [3, -7], [-1, 1], [-2, Buffer.from(jwk.x, 'base64url')], [-3, Buffer.from(jwk.y, 'base64url')]]));
+  const counter = (n) => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b; };
+  const client_data = (type, challenge) => Buffer.from(JSON.stringify({ type, challenge, origin: ORIGIN, crossOrigin: false }));
+
+  // 1. a guest club claims itself with a passkey
+  const ro = await call('register/options', { pid: P });
+  assert.equal(ro.status, 200);
+  const authData = Buffer.concat([rpHash, Buffer.from([0x45]), counter(0), Buffer.alloc(16), Buffer.from([credId.length >> 8, credId.length & 255]), credId, cose]);
+  const cd = client_data('webauthn.create', ro.options.challenge);
+  const rv = await call('register/verify', { cid: ro.cid, label: 'Mi telefono', response: { id: b64(credId), rawId: b64(credId), type: 'public-key', response: { clientDataJSON: b64(cd), attestationObject: b64(cbor({ fmt: 'none', attStmt: {}, authData })), transports: ['internal'] }, clientExtensionResults: {} } });
+  assert.equal(rv.status, 200, rv.error);
+  assert.equal(rv.pid, P);
+  assert.match(rv.recovery, /^[A-Z2-9]{5}(-[A-Z2-9]{5}){3}$/);
+  assert.equal(rv.passkeys.length, 1);
+  assert.equal((await call('register/verify', { cid: ro.cid, response: {} })).status, 400, 'a challenge works once');
+  assert.equal((await call('register/options', { pid: P }, undefined, 'http://evil.example')).status, 400, 'only our own site can ask for passkeys');
+  c.ws.close();
+
+  // 2. now knowing the id is not enough
+  const stranger = client(s.port, P, 'Intruso');
+  await stranger.ready;
+  await sleep(300);
+  assert.equal(stranger.closed, 4003, 'the club asks for a login');
+  const post = (token) => fetch(`${base}/save?pid=${P}`, { method: 'POST', headers: token ? { 'x-nc-token': token } : {}, body: JSON.stringify(newClub()) });
+  assert.equal((await post()).status, 401);
+  assert.equal((await post('x'.repeat(43))).status, 401, 'a made-up token is no good');
+  assert.equal((await fetch(`${base}/save?pid=${P}`)).status, 401, 'reading is protected too');
+  assert.equal((await post(rv.token)).status, 200, 'with the session it works');
+  const welcome = new WebSocket(`ws://127.0.0.1:${s.port}`);
+  const got = [];
+  welcome.on('message', (d) => got.push(JSON.parse(d.toString()).t));
+  await new Promise((r) => welcome.on('open', r));
+  welcome.send(JSON.stringify({ t: 'hello', id: P, name: 'Cuentas', token: rv.token }));
+  await sleep(400);
+  assert.ok(got.includes('city'), 'the owner gets in with the token');
+  welcome.close();
+
+  // 3. another device: sign in with the passkey (no id needed)
+  const lo = await call('login/options');
+  const sign = (n) => {
+    const ad = Buffer.concat([rpHash, Buffer.from([0x05]), counter(n)]);
+    const cdj = client_data('webauthn.get', lo.options.challenge);
+    const sig = crypto.sign('sha256', Buffer.concat([ad, crypto.createHash('sha256').update(cdj).digest()]), { key: privateKey, dsaEncoding: 'der' });
+    return { id: b64(credId), rawId: b64(credId), type: 'public-key', response: { clientDataJSON: b64(cdj), authenticatorData: b64(ad), signature: b64(sig), userHandle: b64(P) }, clientExtensionResults: {} };
+  };
+  const lv = await call('login/verify', { cid: lo.cid, response: sign(1) });
+  assert.equal(lv.status, 200, lv.error);
+  assert.equal(lv.pid, P);
+  assert.notEqual(lv.token, rv.token, 'each device has its own session');
+  const replay = await call('login/options');
+  assert.equal((await call('login/verify', { cid: replay.cid, response: sign(2) })).status, 401, 'a signature for another challenge is refused');
+
+  // 4. a code to link a phone, once, and not for strangers
+  assert.equal((await call('link/create')).status, 401);
+  const lk = await call('link/create', {}, lv.token);
+  assert.match(lk.code, /^\d{8}$/);
+  const joined = await call('link/redeem', { code: lk.code });
+  assert.equal(joined.pid, P);
+  assert.equal((await call('link/redeem', { code: lk.code })).status, 401, 'a code works once');
+  assert.equal((await call('link/redeem', { code: '00000000' })).status, 401);
+  const me = await call('me', {}, joined.token);
+  assert.equal(me.pid, P);
+  assert.equal(me.passkeys.length, 1);
+
+  // 5. every device lost: the recovery code
+  assert.equal((await call('recover', { code: 'AAAAA-AAAAA-AAAAA-AAAAA' })).status, 401);
+  const back = await call('recover', { code: rv.recovery.toLowerCase().replaceAll('-', ' ') });
+  assert.equal(back.pid, P, 'case and separators do not matter');
+  const fresh = await call('recovery/new', {}, back.token);
+  assert.equal((await call('recover', { code: rv.recovery })).status, 401, 'a new recovery code replaces the old one');
+  assert.equal((await call('recover', { code: fresh.recovery })).pid, P);
+  assert.equal((await call('passkey/remove', { id: b64(credId) }, back.token)).status, 400, 'the last passkey cannot be removed');
+
+  // 6. logging out ends that session only
+  await call('logout', {}, joined.token);
+  assert.equal((await call('me', {}, joined.token)).status, 401);
+  assert.equal((await call('me', {}, back.token)).pid, P);
+  stranger.ws.close();
   await s.close();
 });
 

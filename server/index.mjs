@@ -33,6 +33,8 @@ import { Shadows } from './shadow.mjs';
 import { awayTick, settleAway } from './away.mjs';
 import { Ranking } from './ranking.mjs';
 import { cleanChat, cleanName, validId } from './protocol.mjs';
+import { backupDb, importLegacy, openDb, prune, worldStore } from './db.mjs';
+import { createAuth } from './auth.mjs';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -52,12 +54,42 @@ function buildId() {
 }
 const SAVES_DIR = process.env.SAVES_DIR === '' ? null : (process.env.SAVES_DIR ?? new URL('./data/saves', import.meta.url).pathname);
 const AUDIO_DIR = process.env.AUDIO_DIR === '' ? null : (process.env.AUDIO_DIR ?? new URL('./data/audio', import.meta.url).pathname);
-const DATA_FILE = process.env.DATA_FILE === '' ? null : (process.env.DATA_FILE ?? new URL('./data/world.json', import.meta.url).pathname);
+const DATA_FILE = process.env.DATA_FILE === '' ? null : (process.env.DATA_FILE ?? undefined);
+const DB_FILE = process.env.DB_FILE ?? new URL('./data/nightclub.db', import.meta.url).pathname;
+const DB_BACKUPS = process.env.DB_BACKUPS ?? new URL('./data/db-backups', import.meta.url).pathname;
+/** Where players may sign in with passkeys from. A passkey is tied to the site's name: add your domain here when you have one. */
+const AUTH_ORIGINS = (process.env.AUTH_ORIGINS ?? 'http://localhost:5173,http://localhost:8787,http://localhost:4173').split(',').map((s) => s.trim()).filter(Boolean);
 
-export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, audioDir = AUDIO_DIR, maxPerIp = MAX_PER_IP, savesDir = SAVES_DIR, saveEveryMs = 10_000 } = {}) {
-  const world = new World(dataFile);
+export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, audioDir = AUDIO_DIR, maxPerIp = MAX_PER_IP, savesDir, dbFile, saveEveryMs = 10_000, authOrigins = AUTH_ORIGINS } = {}) {
+  // one database file holds the saves, the world and the accounts; tests get a throwaway one (or one inside their own folder)
+  const standard = dbFile === undefined && savesDir === undefined && dataFile === undefined;
+  const dbPath = dbFile !== undefined ? dbFile : typeof savesDir === 'string' ? path.join(savesDir, 'nightclub.db') : standard ? DB_FILE : ':memory:';
+  const db = openDb(dbPath);
+  if (standard) {
+    const moved = importLegacy(db, { worldFile: new URL('./data/world.json', import.meta.url).pathname, savesDir: SAVES_DIR });
+    if (moved.world || moved.saves) console.log(`imported from the old JSON files: world=${moved.world}, saves=${moved.saves}, backups=${moved.backups}`);
+  }
+  const world = new World(dataFile === undefined ? worldStore(db) : dataFile);
+  const auth = createAuth({ db, origins: authOrigins });
+  /** a copy of the whole database every 6 hours (the last 14 are kept): the answer to "I lost my progress" */
+  let dbBackupTimer = null;
+  if (dbPath !== ':memory:') {
+    const snapshot = () => {
+      try {
+        const d = new Date();
+        const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}`;
+        const dir = path.join(path.dirname(dbPath), 'db-backups');
+        backupDb(db, path.join(dir, `nightclub-${stamp}.db`));
+        prune(dir, 'nightclub-', 14);
+      } catch (e) {
+        console.error('database backup failed:', e.message);
+      }
+    };
+    snapshot();
+    dbBackupTimer = setInterval(snapshot, 6 * 3_600_000);
+  }
   const audio = new AudioStore(audioDir);
-  const saves = new SaveStore(savesDir);
+  const saves = new SaveStore(savesDir === null ? null : db);
   const shadows = new Shadows();
   const ranking = new Ranking();
   /** Tell a player (or everybody, with no argument) who is in prison right now, as the city's police would. */
@@ -82,6 +114,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
     for (const id of online.keys()) pushRank(id);
   }
   const lastSave = new Map();
+  const authHits = new Map();
   /** id -> { ws, last: string, lastClub: number, tokens: number, refill: number } */
   const online = new Map();
   const perIp = new Map();
@@ -90,7 +123,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
   let received = 0;
   let lastVersion = -1;
 
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS' };
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, x-nc-token', 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS' };
   const server = http.createServer((req, res) => {
     const u = new URL(req.url ?? '/', 'http://x');
     if (req.method === 'OPTIONS') {
@@ -99,6 +132,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
       // a player uploads a song: the body is the file itself
       const pid = u.searchParams.get('pid') ?? '';
       if (!validId(pid) || !world.players.has(pid)) return void res.writeHead(403, cors).end(JSON.stringify({ error: 'Primero entra a la ciudad.' }));
+      if (!auth.allowed(pid, req.headers['x-nc-token'])) return void res.writeHead(401, cors).end(JSON.stringify({ error: 'Inicia sesión con tu cuenta.', login: true }));
       const chunks = [];
       let size = 0;
       req.on('data', (c) => {
@@ -117,6 +151,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
       // the player's whole game, to keep a copy: the body is the saved game as JSON
       const pid = u.searchParams.get('pid') ?? '';
       if (!validId(pid) || !world.players.has(pid)) return void res.writeHead(403, cors).end(JSON.stringify({ error: 'Primero entra a la ciudad.' }));
+      if (!auth.allowed(pid, req.headers['x-nc-token'])) return void res.writeHead(401, cors).end(JSON.stringify({ error: 'Inicia sesión con tu cuenta.', login: true }));
       const now = Date.now();
       if (now - (lastSave.get(pid) ?? 0) < saveEveryMs) return void res.writeHead(429, cors).end(JSON.stringify({ error: 'Muy seguido.' }));
       const chunks = [];
@@ -148,9 +183,59 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
     } else if (u.pathname === '/save' && req.method === 'GET') {
       // only the owner (who knows the secret code) can read a saved game
       const pid = u.searchParams.get('pid') ?? '';
+      if (validId(pid) && !auth.allowed(pid, req.headers['x-nc-token'])) return void res.writeHead(401, cors).end(JSON.stringify({ error: 'Inicia sesión con tu cuenta.', login: true }));
       const s = validId(pid) ? saves.read(pid) : null;
       if (!s) return void res.writeHead(404, cors).end(JSON.stringify({ error: 'No hay una partida guardada con ese código.' }));
       res.writeHead(200, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify({ at: s.at, meta: s.meta, state: u.searchParams.get('meta') === '1' ? undefined : s.state }));
+    } else if (u.pathname.startsWith('/auth/') && req.method === 'POST') {
+      // accounts: passkeys, device linking and recovery (see auth.mjs). Slow down guessing of codes.
+      const ip = req.socket.remoteAddress ?? '?';
+      const nowA = Date.now();
+      const hits = (authHits.get(ip) ?? []).filter((t) => nowA - t < 60_000);
+      if (hits.length >= 30) return void res.writeHead(429, cors).end(JSON.stringify({ error: 'Demasiados intentos: espera un minuto.' }));
+      hits.push(nowA);
+      authHits.set(ip, hits);
+      const chunks = [];
+      let size = 0;
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > 20_000) req.destroy();
+        else chunks.push(c);
+      });
+      req.on('end', async () => {
+        let body = {};
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+        } catch {
+          return void res.writeHead(400, cors).end(JSON.stringify({ error: 'Petición no válida.' }));
+        }
+        const token = req.headers['x-nc-token'];
+        const origin = req.headers.origin;
+        const device = String(req.headers['user-agent'] ?? '').slice(0, 60);
+        let r;
+        try {
+          const step = u.pathname.slice(6);
+          if (step === 'register/options') {
+            const pid = body.pid;
+            if (!validId(pid) || !world.players.has(pid)) r = { status: 403, error: 'Primero entra a la ciudad.' };
+            else r = await auth.registerOptions({ pid, token, name: world.players.get(pid).club.name, origin });
+          } else if (step === 'register/verify') r = await auth.registerVerify({ cid: body.cid, response: body.response, origin, label: body.label, device });
+          else if (step === 'login/options') r = await auth.loginOptions({ origin });
+          else if (step === 'login/verify') r = await auth.loginVerify({ cid: body.cid, response: body.response, origin, device });
+          else if (step === 'link/create') r = auth.linkCreate({ token });
+          else if (step === 'link/redeem') r = auth.linkRedeem({ code: body.code, device });
+          else if (step === 'recover') r = auth.recover({ code: body.code, device });
+          else if (step === 'recovery/new') r = auth.newRecovery({ token });
+          else if (step === 'me') r = auth.me({ token });
+          else if (step === 'passkey/remove') r = auth.removePasskey({ token, id: body.id });
+          else if (step === 'logout') r = auth.logout({ token });
+          else r = { status: 404, error: 'No existe.' };
+        } catch (e) {
+          r = { status: 500, error: 'Error de cuenta.' };
+          console.error('auth', u.pathname, e);
+        }
+        res.writeHead(r.error ? r.status ?? 400 : 200, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify(r.error ? { error: r.error } : r));
+      });
     } else if (u.pathname === '/admin/pardon' && req.method === 'POST') {
       // only from this very machine (never from the network): the owner undoes a prison that should not have been
       const addr = req.socket.remoteAddress ?? '';
@@ -172,7 +257,9 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
       if (r.ok) pushCrime(world.byN.get(n));
       res.writeHead(r.ok ? 200 : 400, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify(r));
     } else if (u.pathname.startsWith('/audio/') && req.method === 'DELETE') {
-      const ok = audio.remove(u.searchParams.get('pid') ?? '', u.pathname.slice(7));
+      const owner = u.searchParams.get('pid') ?? '';
+      if (validId(owner) && !auth.allowed(owner, req.headers['x-nc-token'])) return void res.writeHead(401, cors).end();
+      const ok = audio.remove(owner, u.pathname.slice(7));
       res.writeHead(ok ? 200 : 404, cors).end();
     } else if (u.pathname.startsWith('/audio/') && req.method === 'GET') {
       const info = audio.info(u.pathname.slice(7));
@@ -254,6 +341,11 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
       if (big && m.t !== 'layout') return ws.close(1009, 'too big');
       if (m.t === 'hello' && !id) {
         if (!validId(m.id)) return ws.close(4002, 'bad id');
+        if (!auth.allowed(m.id, m.token)) {
+          // this club belongs to an account: tell the page to ask for the passkey instead of letting anyone in with the id
+          ws.send(JSON.stringify({ t: 'auth', need: true }));
+          return ws.close(4003, 'login required');
+        }
         clearTimeout(hello);
         id = m.id;
         online.get(id)?.ws.close(4000, 'opened elsewhere'); // one connection per player
@@ -447,7 +539,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
         port: server.address().port,
         world,
         online,
-        saves, shadows, ranking,
+        saves, shadows, ranking, auth, db,
         pushMail,
         deliver,
         pushCrime,
@@ -458,9 +550,10 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
           clearInterval(policeTick);
           clearInterval(awayTimer);
           clearInterval(shadowTick);
+          clearInterval(dbBackupTimer);
           world.save();
           for (const c of online.values()) c.ws.terminate();
-          wss.close(() => server.close(() => done()));
+          wss.close(() => server.close(() => { try { db.close(); } catch { /* already closed */ } done(); }));
         }),
       });
     });

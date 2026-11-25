@@ -7,8 +7,6 @@
 //   - a game that looks like a wipe (far less progress than the stored one) does NOT replace it unless the player explicitly
 //     started over; it is kept apart as "suspect", so nothing is lost either way.
 
-import fs from 'node:fs';
-import path from 'node:path';
 import { sanitizeClub } from '../web/src/core/club.ts';
 import { levelOf } from '../web/src/core/progression.ts';
 import { reconcile, validate } from './vault.mjs';
@@ -23,45 +21,62 @@ const WIPE_MIN_XP = 3000;
 const metaOf = (state) => ({ level: levelOf(state.xp).level, phase: state.phase, coins: state.coins, xp: state.xp });
 
 export class SaveStore {
-  #dir;
-  constructor(dir) {
-    this.#dir = dir;
-    if (dir) fs.mkdirSync(dir, { recursive: true });
-  }
-
-  #file(id, suffix = '') {
-    return path.join(this.#dir, `${id}${suffix}.json`);
+  #db;
+  /** `db`: the city database (see db.mjs), or null when saving to the cloud is off */
+  constructor(db) {
+    this.#db = db;
   }
 
   /** The stored game and when it was stored, or null. */
   read(id) {
-    if (!this.#dir) return null;
+    if (!this.#db) return null;
+    const row = this.#db.prepare('SELECT at, meta, state FROM saves WHERE pid = ?').get(id);
+    if (!row) return null;
     try {
-      return JSON.parse(fs.readFileSync(this.#file(id), 'utf8'));
+      return { at: row.at, meta: JSON.parse(row.meta), state: JSON.parse(row.state) };
     } catch {
       return null;
     }
   }
 
+  /** Every player that has a stored game. */
+  ids() {
+    return this.#db ? this.#db.prepare('SELECT pid FROM saves').all().map((r) => r.pid) : [];
+  }
+
   /** Keep the current copy as a backup, if the last backup is old enough. */
   #backup(id, now) {
-    const cur = this.#file(id);
-    if (!fs.existsSync(cur)) return;
-    const list = this.backups(id);
-    if (list.length && now - list[0].at < BACKUP_EVERY) return;
-    fs.copyFileSync(cur, this.#file(id, `.bak.${now}`));
-    for (const old of this.backups(id).slice(KEEP)) fs.rmSync(this.#file(id, `.bak.${old.at}`), { force: true });
+    const cur = this.#db.prepare('SELECT at, meta, state FROM saves WHERE pid = ?').get(id);
+    if (!cur) return;
+    const last = this.backups(id)[0];
+    if (last && now - last.at < BACKUP_EVERY) return;
+    this.#db.prepare('INSERT OR REPLACE INTO save_backups (pid, at, body) VALUES (?, ?, ?)').run(id, now, JSON.stringify({ at: cur.at, meta: JSON.parse(cur.meta), state: JSON.parse(cur.state) }));
+    this.#db.prepare('DELETE FROM save_backups WHERE pid = ? AND at NOT IN (SELECT at FROM save_backups WHERE pid = ? ORDER BY at DESC LIMIT ?)').run(id, id, KEEP);
   }
 
   /** Backups of a game, newest first. */
   backups(id) {
-    if (!this.#dir) return [];
-    return fs
-      .readdirSync(this.#dir)
-      .filter((f) => f.startsWith(`${id}.bak.`))
-      .map((f) => ({ at: Number(f.slice(id.length + 5, -5)) }))
-      .filter((b) => Number.isFinite(b.at))
-      .sort((a, b) => b.at - a.at);
+    if (!this.#db) return [];
+    return this.#db.prepare('SELECT at FROM save_backups WHERE pid = ? ORDER BY at DESC').all(id).map((r) => ({ at: r.at }));
+  }
+
+  /** A stored backup (the same shape as read), or null. */
+  backup(id, at) {
+    const row = this.#db?.prepare('SELECT body FROM save_backups WHERE pid = ? AND at = ?').get(id, at);
+    return row ? JSON.parse(row.body) : null;
+  }
+
+  #put(id, now, meta, state) {
+    // the backup and the new copy go in together: either both happen or none
+    this.#db.exec('BEGIN');
+    try {
+      this.#backup(id, now);
+      this.#db.prepare('INSERT INTO saves (pid, at, meta, state) VALUES (?, ?, ?, ?) ON CONFLICT(pid) DO UPDATE SET at = excluded.at, meta = excluded.meta, state = excluded.state').run(id, now, JSON.stringify(meta), JSON.stringify(state));
+      this.#db.exec('COMMIT');
+    } catch (e) {
+      this.#db.exec('ROLLBACK');
+      throw e;
+    }
   }
 
   /** Change the stored game on the server's own authority (a robbery settled): no validation, no wipe guard. */
@@ -69,16 +84,13 @@ export class SaveStore {
     const cur = this.read(id);
     if (!cur) return false;
     const state = sanitizeClub(fn(cur.state));
-    this.#backup(id, now);
-    const tmp = `${this.#file(id)}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ at: now, meta: metaOf(state), state }));
-    fs.renameSync(tmp, this.#file(id));
+    this.#put(id, now, metaOf(state), state);
     return true;
   }
 
   /** Store a game. `force`: the player started over on purpose. Returns { ok, meta } or { error, status }. */
   write(id, raw, force = false, now = Date.now(), pending = [], measured = null) {
-    if (!this.#dir) return { error: 'El guardado en la nube no está activo.', status: 503 };
+    if (!this.#db) return { error: 'El guardado en la nube no está activo.', status: 503 };
     let state;
     try {
       state = sanitizeClub(raw);
@@ -93,13 +105,10 @@ export class SaveStore {
     const meta = metaOf(state);
     if (prev && !force && prev.meta.xp >= WIPE_MIN_XP && meta.xp < prev.meta.xp * WIPE_RATIO) {
       // looks like a wipe: keep it apart and leave the good copy where it is
-      fs.writeFileSync(this.#file(id, '.suspect'), JSON.stringify({ at: now, meta, state }));
+      this.#db.prepare('INSERT OR REPLACE INTO save_suspects (pid, body) VALUES (?, ?)').run(id, JSON.stringify({ at: now, meta, state }));
       return { error: 'Esta partida tiene mucho menos progreso que la guardada: no la reemplacé (se guardó aparte).', status: 409, meta: prev.meta };
     }
-    this.#backup(id, now);
-    const tmp = `${this.#file(id)}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ at: now, meta, state }));
-    fs.renameSync(tmp, this.#file(id));
+    this.#put(id, now, meta, state);
     return { ok: true, meta, at: now, flags: checked.flags };
   }
 }

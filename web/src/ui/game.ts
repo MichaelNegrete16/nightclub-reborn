@@ -17,6 +17,7 @@ import { openFacade } from './facade';
 import { caricature } from './caricature';
 import { openOffice } from './office';
 import { openMenu } from './menu';
+import { openAccount } from './account';
 import { mountMinimap } from './minimap';
 import { openMusic } from './music';
 import { openUnlocks } from './unlocks';
@@ -177,6 +178,10 @@ export class GameUi {
 
   openMissions(): void {
     openMissions(this.ctx);
+  }
+
+  openAccount(needLogin = false): void {
+    openAccount(this.ctx, needLogin);
   }
 
   openMenu(): void {

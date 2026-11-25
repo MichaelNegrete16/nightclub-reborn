@@ -1,4 +1,5 @@
 import { GENRES, GENRE_BY_ID, allTracks, type Genre, type Track } from '../core/music';
+import { authHeaders } from '../net/session';
 import { saveFile } from '../audio/files';
 import { guestId, httpBase } from '../net/client';
 import { button, el } from './dom';
@@ -69,7 +70,7 @@ export function openMusic(ctx: Ctx): void {
       if (base && club.net.status === 'online') {
         msg.textContent = `Subiendo "${f.name}"…`;
         try {
-          const r = await fetch(`${base}/upload?pid=${guestId()}&title=${encodeURIComponent(f.name.slice(0, 60))}`, { method: 'POST', body: f });
+          const r = await fetch(`${base}/upload?pid=${guestId()}&title=${encodeURIComponent(f.name.slice(0, 60))}`, { method: 'POST', body: f, headers: authHeaders() });
           const j = (await r.json()) as { id?: string; error?: string };
           if (!r.ok || !j.id) {
             msg.textContent = j.error ?? 'No se pudo subir la canción.';

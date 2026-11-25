@@ -875,7 +875,11 @@ export class ClubView {
       if (m.kind === 'police') {
         const shutMin = Math.round(((m.closedUntil ?? 0) - m.at) / 60000);
         const shut = (m.closedUntil ?? 0) > m.at ? ` Clausuraron el club ${shutMin >= 60 ? `${Math.round(shutMin / 60)} h` : `${Math.max(1, shutMin)} min`}.` : '';
-        this.hooks.onToast(`La Brigada del Ruido pasó por tu club${took ? `: se llevó ${took}` : ''}.${shut}`, 'bad');
+        if (m.story === 'raid') {
+          // stolen goods found in the club: the owner is arrested
+          this.hooks.onJail(m);
+          this.hooks.onToast(`¡La Brigada encontró piezas robadas en tu club${took ? ` (${took})` : ''}! Vas a prisión: haz ${m.chores ?? 20} tareas para salir.`, 'bad');
+        } else this.hooks.onToast(`La Brigada del Ruido pasó por tu club${took ? `: se llevó ${took}` : ''}.${shut}`, 'bad');
       } else if (m.kind === 'fee') {
         this.hooks.onToast(`Pagaste ${m.cash.toLocaleString('es-CO')} monedas: ${m.byName}.`, 'ok');
       } else if (m.kind === 'jail') {

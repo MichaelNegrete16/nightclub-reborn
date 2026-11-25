@@ -1,6 +1,7 @@
 import { newClub, sanitizeClub, type ClubState } from '../core/club';
 import { levelOf } from '../core/progression';
 import { guestId, httpBase } from './client';
+import { authHeaders } from './session';
 
 export interface CloudMeta {
   level: number;
@@ -52,7 +53,7 @@ export class Cloud {
     if (!force && body === this.last) return false;
     this.busy = true;
     try {
-      const r = await fetch(url, { method: 'POST', body });
+      const r = await fetch(url, { method: 'POST', body, headers: authHeaders() });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; meta?: CloudMeta; at?: number };
       if (r.ok && j.ok && j.meta) {
         this.last = body;
@@ -77,7 +78,7 @@ export class Cloud {
     const base = httpBase();
     if (!base) return null;
     try {
-      const r = await fetch(`${base}/save?pid=${encodeURIComponent(code)}&meta=1`);
+      const r = await fetch(`${base}/save?pid=${encodeURIComponent(code)}&meta=1`, { headers: authHeaders() });
       if (!r.ok) return null;
       return (await r.json()) as CloudInfo;
     } catch {
@@ -90,7 +91,7 @@ export class Cloud {
     const base = httpBase();
     if (!base) return null;
     try {
-      const r = await fetch(`${base}/save?pid=${encodeURIComponent(code)}`);
+      const r = await fetch(`${base}/save?pid=${encodeURIComponent(code)}`, { headers: authHeaders() });
       if (!r.ok) return null;
       const j = (await r.json()) as { state: unknown; meta: CloudMeta };
       return { state: sanitizeClub(j.state), meta: j.meta };

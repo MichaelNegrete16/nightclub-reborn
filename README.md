@@ -24,6 +24,8 @@ Node 22 o superior (el servidor importa los módulos `.ts` de `web/src/core` dir
    `HOST=0.0.0.0 PORT=8787 MAX_PER_IP=50 node --experimental-strip-types index.mjs`
    El servidor también entrega `web/dist/` (una sola dirección para el juego y la ciudad).
 3. Variables: `PORT`, `HOST`, `MAX_PER_IP` (conexiones por IP), `STATIC_DIR` (otra carpeta del juego), `SONGS_DIR`.
+4. Base de datos: todo (partidas, ciudad, cuentas) vive en `server/data/nightclub.db` (SQLite, sin instalar nada; Node 22.13+). Variables: `DB_FILE` (otra ruta). Cada 6 horas se guarda una copia en `data/db-backups/` (las últimas 14). La primera vez que arranca importa los JSON viejos (`data/world.json`, `data/saves/`) sin borrarlos.
+5. Cuentas con passkey: una passkey queda atada al nombre del sitio. Antes de salir a internet, define `AUTH_ORIGINS` con la dirección exacta del juego (por ejemplo `https://mijuego.com`); el valor por defecto solo sirve para `localhost`. Las passkeys exigen https (o localhost): en un celular por http de la red local solo funcionan los códigos de enlace.
 4. Detrás de HTTPS (nginx o Caddy) el juego usa `wss://` solo; los datos de los jugadores quedan en `server/data/` (hacer respaldo, y **no** subirlos al repositorio).
 5. Cada versión nueva: agregar su entrada al principio de `NEWS` en `web/src/core/news.ts` y reiniciar el servidor (el catálogo y las reglas se comparten con él).
 

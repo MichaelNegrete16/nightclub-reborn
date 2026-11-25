@@ -24,6 +24,19 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25n',
+    date: '25 de noviembre de 2026',
+    title: 'Cuenta con passkey y tu club en todos tus dispositivos',
+    intro: 'Protege tu club con tu huella o tu cara y juega con el mismo progreso en el celular y el computador.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Passkey: sin contraseñas', text: 'Crea tu passkey con la huella, la cara o el PIN del dispositivo. Desde ese momento solo tú puedes abrir tu club: saber tu código ya no basta.', where: 'Menú › Cuenta › Mi cuenta' },
+      { kind: 'icon', ref: 'move', title: 'Otro dispositivo', text: 'Entra con tu passkey o genera un código de 8 dígitos en un dispositivo y escríbelo en el otro. Tu club baja con todo su progreso.', where: 'Menú › Cuenta › Vincular otro dispositivo' },
+      { kind: 'icon', ref: 'stash', title: 'Código de recuperación', text: 'Al crear la cuenta recibes un código largo. Guárdalo: es tu salvavidas si pierdes todos tus dispositivos.', where: 'Se muestra al crear la passkey' },
+      { kind: 'icon', ref: 'city', title: 'Todo en una base de datos', text: 'Las partidas, la ciudad y las cuentas ahora viven en una base de datos con copias automáticas cada 6 horas.', where: 'Servidor' },
+      { kind: 'icon', ref: 'star', title: 'La Brigada también arresta', text: 'Si la policía clausura tu club y encuentra piezas robadas, te arrestan: vas a prisión, haces tus tareas y ves la escena del arresto.', where: 'Robos y policía' },
+    ],
+  },
+  {
     id: '2026-11-25m',
     date: '25 de noviembre de 2026',
     title: '12 canciones nuevas y arreglos de robos',

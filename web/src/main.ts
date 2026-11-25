@@ -12,6 +12,7 @@ import { CATALOG } from './core/catalog';
 import { simulatedNeighbors } from './core/world';
 import { Cloud, looksFresh, describe as describeSave } from './net/cloud';
 import { Online, guestId, httpBase, neighborsFrom, serverUrl } from './net/client';
+import { authHeaders } from './net/session';
 import { Avatar } from './render/avatar';
 import { ClubView, type ClubHooks } from './render/club';
 import { ComicStudio } from './render/comic';
@@ -235,6 +236,8 @@ async function main() {
       onScout: (fn) => (heistListeners.scout = fn),
       onHeist: (fn) => (heistListeners.heist = fn),
     };
+    net.onAuth = () => ui.openAccount(true);
+    net.onElsewhere = () => uiHooks?.onToast('Abriste el juego en otro dispositivo: esta ventana se pausó. Recarga para volver aquí.', 'bad');
     club.launder = (uid) => net.launder(uid);
     net.onLaunder = (r) => {
       uiHooks?.onToast(r.ok ? `Pieza limpia: pagaste ${(r.price ?? 0).toLocaleString('es-CO')} a Zeta.` : r.error ?? 'No se pudo limpiar.', r.ok ? 'ok' : 'bad');
@@ -303,7 +306,7 @@ async function main() {
       chat.add({ name: club.state.story.name || 'Yo', text, mine: true });
     };
     club.music.audioBase = httpBase() ?? '';
-    club.onCloudRemove = (ref) => void fetch(`${httpBase()}/audio/${ref}?pid=${guestId()}`, { method: 'DELETE' }).catch(() => {});
+    club.onCloudRemove = (ref) => void fetch(`${httpBase()}/audio/${ref}?pid=${guestId()}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {});
     net.onVisit = (v) => club.enterVisit(v);
     club.requestVisit = (n) => net.visit(n);
     net.onStatus = ((prev) => (s) => {

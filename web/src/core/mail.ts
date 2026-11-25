@@ -22,7 +22,7 @@ export interface Mail {
   minutes?: number;
   /** jail: what was taken (cash), how the thief was found out, and which piece they went for */
   stolenCash?: number;
-  story?: 'caught' | 'convicted';
+  story?: 'caught' | 'convicted' | 'raid';
   /** jail: how many chores to do to get out */
   chores?: number;
   /** police: the club is shut until then (ms) */
@@ -96,7 +96,7 @@ export function cleanMail(raw: unknown): Mail[] {
       ...(Number.isFinite(x.closedUntil) ? { closedUntil: x.closedUntil } : {}),
       ...(Number.isFinite(x.stolenCash) ? { stolenCash: Math.max(0, Math.floor(x.stolenCash as number)) } : {}),
       ...(Number.isFinite(x.chores) ? { chores: Math.max(0, Math.min(Math.floor(x.chores as number), 200)) } : {}),
-      ...(x.story === 'caught' || x.story === 'convicted' ? { story: x.story } : {}),
+      ...(x.story === 'caught' || x.story === 'convicted' || x.story === 'raid' ? { story: x.story } : {}),
       ...(Number.isFinite(x.minutes) ? { minutes: Math.max(0, Math.min(Math.floor(x.minutes as number), 100000)) } : {}),
       kitsUsed: Array.isArray(x.kitsUsed) ? (x.kitsUsed.filter((k) => ['picks', 'jammer', 'van', 'disguise'].includes(k as string)) as Kit[]).slice(0, 4) : undefined,
       by: Number.isInteger(x.by) ? (x.by as number) : -1,
