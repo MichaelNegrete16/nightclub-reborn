@@ -25,8 +25,16 @@ export interface Prepared {
 
 export const modelUrl = (sex: Sex) => `${import.meta.env.BASE_URL}models/base_${sex}.glb`;
 
+const MODELS = new Map<Sex, Promise<GLTF>>();
+
 export function loadModel(sex: Sex): Promise<GLTF> {
-  return new GLTFLoader().loadAsync(modelUrl(sex));
+  let p = MODELS.get(sex);
+  if (!p) {
+    p = new GLTFLoader().loadAsync(modelUrl(sex));
+    p.catch(() => MODELS.delete(sex));
+    MODELS.set(sex, p);
+  }
+  return p;
 }
 
 /** Independent copy of a loaded model (skeleton included), ready to be tinted and animated. */
@@ -120,8 +128,7 @@ export class Avatar {
   async setSex(sex: Sex): Promise<void> {
     let prepared = this.cache.get(sex);
     if (!prepared) {
-      const gltf = await loadModel(sex);
-      prepared = prepareModel(gltf.scene, withDances(gltf));
+      prepared = instantiate(await loadModel(sex));
       this.cache.set(sex, prepared);
     }
     if (this.current) this.group.remove(this.current.root);
