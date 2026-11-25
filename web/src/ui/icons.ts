@@ -13,6 +13,7 @@ export const ICONS: Record<string, string> = {
   guests: svg('<circle cx="9" cy="8.5" r="3"/><circle cx="17" cy="9.5" r="2.4"/><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5M15.5 14.8c2.6-.3 4.8 1.2 5.5 4.2"/>'),
   luxury: svg('<path d="m12 3 8 6-8 12L4 9l8-6z"/><path d="M4 9h16M9.5 9 12 21l2.5-12M12 3l-2.5 6M12 3l2.5 6"/>'),
   rotate: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>'),
+  select: svg('<rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.5"/><path d="M9 12h6M12 9v6"/>'),
   move: svg('<path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/>'),
   stash: svg('<path d="M3.5 9.5 12 5l8.5 4.5V17L12 21.5 3.5 17V9.5z"/><path d="M12 2v7M9 6.5 12 9.5l3-3"/>'),
   sell: svg('<path d="M3.5 12.5 12 4h7.5v7.5L11 20 3.5 12.5z"/><circle cx="15.5" cy="8.5" r="1.3"/>'),

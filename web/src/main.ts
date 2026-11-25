@@ -146,6 +146,7 @@ async function main() {
     onVip: (v) => uiHooks?.onVip(v),
     onStar: (c, n) => uiHooks?.onStar?.(c, n),
     onJail: (m) => uiHooks?.onJail(m),
+    onBank: (m) => uiHooks?.onBank?.(m),
     onMode: (m) => uiHooks?.onMode(m),
   });
   club.setState(loadClub());
@@ -239,6 +240,10 @@ async function main() {
     net.onAuth = () => ui.openAccount(true);
     net.onElsewhere = () => uiHooks?.onToast('Abriste el juego en otro dispositivo: esta ventana se pausó. Recarga para volver aquí.', 'bad');
     club.launder = (uid) => net.launder(uid);
+    club.bankOp = (op, amount) => net.bank(op, amount);
+    net.onBank = (r) => {
+      if (!r.ok) uiHooks?.onToast(r.error ?? 'El banco no pudo con eso.', 'bad');
+    };
     net.onLaunder = (r) => {
       uiHooks?.onToast(r.ok ? `Pieza limpia: pagaste ${(r.price ?? 0).toLocaleString('es-CO')} a Zeta.` : r.error ?? 'No se pudo limpiar.', r.ok ? 'ok' : 'bad');
       if (r.ok) {

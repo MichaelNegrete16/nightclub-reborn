@@ -24,7 +24,7 @@ export function assetValue(s: ClubState): number {
     if (def) total += invested(def.price, tierOfItem(it));
   }
   for (const [id, n] of Object.entries(s.inventory)) total += (BY_ID.get(id)?.price ?? 0) * n;
-  for (const k of s.kept ?? []) {
+  for (const k of [...(s.kept ?? []), ...(s.embargoed ?? [])]) {
     const def = BY_ID.get(k.id);
     if (def) total += invested(def.price, k.tier);
   }
@@ -41,7 +41,7 @@ export function assetValue(s: ClubState): number {
   return total;
 }
 
-export const wealthOf = (s: ClubState): number => s.coins + assetValue(s);
+export const wealthOf = (s: ClubState): number => s.coins + assetValue(s) - (s.loan?.owed ?? 0);
 
 /** Most coins per minute a club could earn: a few times what the simulated players earn (see scripts/economy-sim.mjs). */
 export function incomePerMinuteCap(prev: ClubState, next: ClubState): number {

@@ -1,4 +1,6 @@
 import { unlocksAt } from '../core/unlocks';
+import { BANK, lendLimit } from '../core/bank';
+import { openBank } from './bank';
 import { expansionState, nextExpansion } from '../core/expansion';
 import { phaseOf } from '../core/club';
 import { MAX_TIER, nextRenovation, upkeepPerMinute } from '../core/renovation';
@@ -35,9 +37,10 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
   const reports = el('div', 'upgrades');
   const reviewsBox = el('div', 'upgrades');
   const guardBox = el('div', 'upgrades');
+  const bankBox = el('div', 'upgrades');
   const grow = el('div', 'upgrades');
   const reform = el('div', 'upgrades');
-  modal.body.append(summary, el('h3', 'office-title', 'Protector antirrobos'), guardBox, el('h3', 'office-title', 'Reseñas de tus invitados'), reviewsBox, el('h3', 'office-title', 'Tu equipo'), team, el('h3', 'office-title', 'Botín (piezas robadas)'), bag, el('h3', 'office-title', 'Informes (robos y policía)'), reports, el('h3', 'office-title', 'Ampliación del local'), grow, el('h3', 'office-title', 'Reformas del local'), reform, el('h3', 'office-title', 'Próximos desbloqueos'), soon, foot);
+  modal.body.append(summary, el('h3', 'office-title', 'Protector antirrobos'), guardBox, el('h3', 'office-title', 'Reseñas de tus invitados'), reviewsBox, el('h3', 'office-title', 'Banco'), bankBox, el('h3', 'office-title', 'Tu equipo'), team, el('h3', 'office-title', 'Botín (piezas robadas)'), bag, el('h3', 'office-title', 'Informes (robos y policía)'), reports, el('h3', 'office-title', 'Ampliación del local'), grow, el('h3', 'office-title', 'Reformas del local'), reform, el('h3', 'office-title', 'Próximos desbloqueos'), soon, foot);
 
   const stat = (label: string, value: string) => {
     const d = el('div', 'stat');
@@ -123,6 +126,17 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
     gCard.append(gHead, gRow);
     guardBox.replaceChildren(gCard);
 
+    // the bank: a loan to buy sooner (the window itself is ui/bank.ts)
+    const bk = el('div', 'upgrade');
+    const bkText = el('div', 'upgrade-text');
+    const loan = s.loan;
+    bkText.append(
+      el('b', '', loan ? `Debes ${fmt(loan.owed)}${loan.due > 0 ? ` · atrasado ${fmt(loan.due)}` : ''}` : levelNow(s) >= BANK.minLevel ? `Préstamo de hasta ${fmt(lendLimit(s))}` : `El banco presta desde el nivel ${BANK.minLevel}`),
+      el('span', '', loan ? `Cuota de ${fmt(loan.installment)} por hora${loan.closed ? ' · club clausurado por el banco' : ''}` : 'Plata hoy, cuotas por hora y una comisión fija.'),
+    );
+    bk.append(bkText, button('Abrir el banco', 'upgrade-buy', () => { modal.close(); openBank(ctx); }));
+    bankBox.replaceChildren(bk);
+
     // the reviews: what the guests said on leaving, and what to do about the complaints that repeat
     const rv = s.reviews;
     const avg = averageStars(rv);
@@ -150,12 +164,13 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
     reviewsBox.replaceChildren(head, ...(adviceRows.length ? [el('h4', 'review-sub', 'Qué mejorar')] : []), ...adviceRows, ...(list.length ? [el('h4', 'review-sub', 'Lo último que dijeron')] : []), ...list);
 
     // the reports: who robbed me (with a way to take revenge), my own jobs, and the police visits
-    const rep: HTMLElement[] = s.reports.slice(0, 8).map((x) => {
+    const rep: HTMLElement[] = s.reports.filter((x) => !(x.kind === 'bank' && x.event === 'payment')).slice(0, 8).map((x) => {
       const r = el('div', `upgrade${x.kind === 'robbed' ? ' hot' : ''}`);
       const tx = el('div', 'upgrade-text');
       const what = [x.cash ? `${fmt(x.cash)} monedas` : '', ...x.pieces.map((id) => BY_ID.get(id)?.name ?? id)].filter(Boolean).join(' y ') || 'nada';
       const when = new Date(x.at).toLocaleString('es-CO', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-      const title = x.kind === 'robbed' ? `Te asaltó ${x.byName || 'alguien'}` : x.kind === 'loot' ? `Tu golpe a ${x.byName || 'un club'}` : 'Visita de la Brigada del Ruido';
+      const bankTitle: Record<string, string> = { granted: 'Préstamo del banco', late: 'Cuota atrasada', mora: 'Mora con el banco', embargo: 'Embargo del banco', closure: 'Clausura del banco', reopened: 'Clausura levantada', repaid: 'Deuda pagada de una vez', paid: 'Deuda pagada' };
+      const title = x.kind === 'bank' ? bankTitle[x.event ?? ''] ?? 'Banco del Ruido' : x.kind === 'robbed' ? `Te asaltó ${x.byName || 'alguien'}` : x.kind === 'loot' ? `Tu golpe a ${x.byName || 'un club'}` : 'Visita de la Brigada del Ruido';
       tx.append(el('b', '', title), el('span', '', `${when} · ${x.kind === 'police' ? 'multa y decomiso' : x.kind === 'robbed' ? 'se llevó' : 'sacaste'}: ${what}${x.closedUntil > x.at ? ' · clausura' : ''}`));
       r.append(tx);
       if (x.kind === 'robbed' && x.by >= 0 && club.heistApi) r.append(button('Vengarme', 'upgrade-buy', () => { modal.close(); openHeist(ctx, x.by, club.heistApi!); }));

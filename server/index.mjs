@@ -9,6 +9,8 @@
 //                     { t: 'scout', n }                 look at the club in lot n before robbing it
 //                     { t: 'heist', n, want, kits, skill }   try the robbery
 //                     { t: 'launder', uid }             pay to clean a stolen piece
+//                     { t: 'loan', amount }             ask the bank for a loan
+//                     { t: 'repay', amount | 'all' }    pay the bank
 //                     { t: 'chat', text }               say something (heard within three lots)
 //                     { t: 'visit', n }                 show me the club of the player in lot n
 //   server -> client  { t: 'city', me: {i,j,n}, clubs: [...], online }   the lots around me and who lives there
@@ -29,6 +31,7 @@ import { AudioStore, MAX_FILE } from './audio.mjs';
 import { MAX_SAVE_BYTES, SaveStore } from './saves.mjs';
 import { attempt, buyGuard, detain, doChore, launder, pardon, scout } from './heists.mjs';
 import { patrolTick } from './police.mjs';
+import { bankTick, lend, payback } from './bank.mjs';
 import { Shadows } from './shadow.mjs';
 import { awayTick, settleAway } from './away.mjs';
 import { Ranking } from './ranking.mjs';
@@ -412,6 +415,13 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
         const r = buyGuard(world, saves, id, m.hours, deliver);
         ws.send(JSON.stringify({ t: 'guard', ...r }));
         pushCrime(id);
+      } else if ((m.t === 'loan' || m.t === 'repay') && id) {
+        const now = Date.now();
+        if (now - (conn.lastBank ?? 0) < 1000) return;
+        conn.lastBank = now;
+        const r = m.t === 'loan' ? lend(world, saves, id, m.amount, deliver) : payback(world, saves, id, m.amount === 'all' ? 'all' : m.amount, deliver);
+        ws.send(JSON.stringify({ t: 'bank', op: m.t, ...r }));
+        pushCrime(id);
       } else if (m.t === 'launder' && id && typeof m.uid === 'string') {
         const r = launder(saves, id, m.uid);
         ws.send(JSON.stringify({ t: 'launder', uid: m.uid, ...r }));
@@ -527,6 +537,16 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
     }
   }, 60000);
 
+  // the bank's clock: one minute at a time, only while the server is up
+  const bankTimer = setInterval(() => {
+    try {
+      bankTick(world, saves, deliver);
+      for (const id of online.keys()) pushCrime(id);
+    } catch (e) {
+      console.error('bank tick failed', e);
+    }
+  }, 60000);
+
   const tick = setInterval(() => {
     if (world.version === lastVersion) return;
     lastVersion = world.version;
@@ -548,6 +568,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
           clearInterval(peersTick);
           clearInterval(clockTick);
           clearInterval(policeTick);
+          clearInterval(bankTimer);
           clearInterval(awayTimer);
           clearInterval(shadowTick);
           clearInterval(dbBackupTimer);

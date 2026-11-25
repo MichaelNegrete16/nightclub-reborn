@@ -132,6 +132,22 @@ test('every bar can have its own bartender, a second booth a second DJ, and a wa
   assert.equal(sanitizeClub({ staff: { waiter: 99 } }).staff.waiter, 4);
 });
 
+test('each booth has its own DJ place: the best booth gets the first DJ, and a booth against the wall still gets one', () => {
+  let s = { ...rich(2), phase: 4 };
+  s = placeItem(s, 'dj_booth', 12, 1, 0, 'free').state;
+  s = placeItem(s, 'dj_booth_pro', 0, 8, 1, 'free').state; // turned, against the west wall
+  const spots = staffSpots(s);
+  assert.equal(spots.dj.length, 2, 'one place per booth, not several at the same booth');
+  const hired = (n) => ({ ...s, staff: { guard: 0, dj: n, bartender: 0, waiter: 0 } });
+  assert.equal(working(hired(1)).dj, 1);
+  assert.equal(working(hired(2)).dj, 2);
+  assert.equal(working(hired(2)).dj <= staffSpots(s).dj.length, true);
+  // the first DJ stands at the professional booth (it comes first), the second at the plain one
+  const pro = s.items.find((i) => i.id === 'dj_booth_pro');
+  const first = spots.dj[0];
+  assert.ok(first.x >= pro.x - 1 && first.x <= pro.x + 3 && first.z >= pro.y - 1 && first.z <= pro.y + 4, 'the first place is at the professional booth');
+});
+
 test('workers stand on free cells, never in the furniture or the wall; no free cell, no work', () => {
   const base = { ...rich(2), staff: { guard: 0, dj: 1, bartender: 2 } };
   // furniture flush against the north wall: the worker takes a free cell at the end of the piece
@@ -149,9 +165,8 @@ test('workers stand on free cells, never in the furniture or the wall; no free c
   assert.equal(working(s).dj, 1);
   // boxed in on every side: nowhere to stand, so nobody works and nobody is paid
   let boxed = placeItem(base, 'dj_booth', 0, 0, 0, 'free').state;
-  boxed = placeItem(boxed, 'plant', 2, 0, 0, 'free').state;
-  boxed = placeItem(boxed, 'plant', 0, 1, 0, 'free').state;
-  boxed = placeItem(boxed, 'plant', 1, 1, 0, 'free').state;
+  // (put the plants straight into the room: the game would not let a booth be walled in)
+  boxed = { ...boxed, items: [...boxed.items, ...[[2, 0], [0, 1], [1, 1]].map(([x, y], i) => ({ uid: `p${i}`, id: 'plant', x, y, rot: 0 }))] };
   assert.equal(working(boxed).dj, 0);
   assert.equal(wagePerMinute({ ...boxed, staff: { guard: 0, dj: 1, bartender: 0 } }), 0);
 });

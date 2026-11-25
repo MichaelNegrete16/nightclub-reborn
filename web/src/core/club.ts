@@ -13,6 +13,7 @@ import { newMusic, sanitizeMusic, type MusicState } from './music.ts';
 import { newOffline, sanitizeOffline, type OfflineInfo } from './offline.ts';
 import { sanitizeRenovation } from './renovation.ts';
 import { newStaff, sanitizeStaff, type StaffCount } from './staff.ts';
+import type { Loan } from './bank.ts';
 import { PRICE_SCALE } from './pricing.ts';
 import { TIER_LEVEL, TIER_LUXURY, TIER_NAMES, clampTier, invested, soundQuality, upgradeCost, type Tier } from './tiers.ts';
 import { XP, levelOf } from './progression.ts';
@@ -120,6 +121,12 @@ export interface ClubState {
   loot: LootPiece[];
   /** improved pieces taken out of the room and kept, with their version */
   kept: KeptPiece[];
+  /** the bank's loan, if any (the server keeps the real books: this is what the game shows) */
+  loan: Loan | null;
+  /** pieces the bank holds until the debt is paid */
+  embargoed: KeptPiece[];
+  /** no new loans until this time (ms) */
+  badCreditUntil: number;
   /** the last letters about robberies and police visits (newest first) */
   reports: Report[];
   /** what the guests said about the club when they left (newest first) */
@@ -130,7 +137,9 @@ export interface Report {
   /** the letter's id: a letter is only written down once */
   id: string;
   at: number;
-  kind: 'robbed' | 'loot' | 'police' | 'income' | 'fee' | 'jail' | 'refund';
+  kind: 'robbed' | 'loot' | 'police' | 'income' | 'fee' | 'jail' | 'refund' | 'bank';
+  /** bank: what happened (see core/bank.ts) */
+  event?: string;
   /** lot number and name of the other side (thief, victim, or the police) */
   by: number;
   byName: string;
@@ -183,6 +192,9 @@ export function newClub(): ClubState {
     kits: { picks: 0, jammer: 0, van: 0, disguise: 0 },
     loot: [],
     kept: [],
+    loan: null,
+    embargoed: [],
+    badCreditUntil: 0,
     reports: [],
     reviews: [],
   };
@@ -443,6 +455,78 @@ export function sellKept(state: ClubState, uid: string): Result {
   return { state: { ...state, coins: state.coins + sellValue(def, k.tier), kept: state.kept.filter((x) => x.uid !== uid) } };
 }
 
+// ---- groups: moving, stashing and selling many pieces at once (a whole dance floor) ------------------------------------------------
+
+/** The pieces whose whole footprint lies inside the rectangle between two cells (any corner order). `floorsOnly`: just the floor tiles. */
+export function itemsInRect(state: ClubState, ax: number, ay: number, bx: number, by: number, floorsOnly: boolean): PlacedItem[] {
+  const x0 = Math.min(ax, bx);
+  const x1 = Math.max(ax, bx);
+  const y0 = Math.min(ay, by);
+  const y1 = Math.max(ay, by);
+  return state.items.filter((it) => {
+    const def = BY_ID.get(it.id);
+    if (!def || (floorsOnly && def.layer !== 'floor')) return false;
+    return cellsOf(def, it.x, it.y, it.rot).every(([cx, cy]) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1);
+  });
+}
+
+/**
+ * Move several pieces by the same (dx, dy) in one go. They are put down one after another against everything that stays and
+ * the ones already moved, so every rule of placing (walls, the door, the limits, keeping the way free) holds for the whole group.
+ * All or nothing: if one does not fit, nothing moves and the reason says which.
+ */
+export function moveGroup(state: ClubState, uids: readonly string[], dx: number, dy: number): Result {
+  const moving = new Set(uids);
+  const group = state.items.filter((i) => moving.has(i.uid));
+  if (!group.length) return { state, error: 'No hay nada seleccionado.' };
+  if (dx === 0 && dy === 0) return { state };
+  let acc: ClubState = { ...state, items: state.items.filter((i) => !moving.has(i.uid)) };
+  const moved: PlacedItem[] = [];
+  for (const it of group) {
+    const def = BY_ID.get(it.id);
+    if (!def) return { state, error: 'Objeto desconocido' };
+    const check = validatePlacement(acc, def, it.x + dx, it.y + dy, it.rot);
+    if (!check.ok) return { state, error: check.reason ?? 'No cabe ahí' };
+    const next = { ...it, x: it.x + dx, y: it.y + dy };
+    moved.push(next);
+    acc = { ...acc, items: [...acc.items, next] };
+  }
+  const byUid = new Map(moved.map((m) => [m.uid, m]));
+  return { state: { ...state, items: state.items.map((i) => byUid.get(i.uid) ?? i) } };
+}
+
+/** Put several pieces away: basic ones to the inventory, improved ones to the stash, hot ones back to the bag. Returns how many went. */
+export function stashGroup(state: ClubState, uids: readonly string[], now = Date.now()): { state: ClubState; done: number; skipped: number; error?: string } {
+  let next = state;
+  let done = 0;
+  let error: string | undefined;
+  for (const uid of uids) {
+    const r = stashItem(next, uid, now);
+    if (r.error) error = r.error;
+    else {
+      next = r.state;
+      done++;
+    }
+  }
+  return { state: next, done, skipped: uids.length - done, error };
+}
+
+/** What selling these pieces would pay. */
+export function groupValue(state: ClubState, uids: readonly string[]): number {
+  const set = new Set(uids);
+  return state.items.reduce((sum, i) => {
+    const def = set.has(i.uid) ? BY_ID.get(i.id) : undefined;
+    return def ? sum + sellValue(def, tierOfItem(i)) : sum;
+  }, 0);
+}
+
+/** Sell several pieces at once. */
+export function sellGroup(state: ClubState, uids: readonly string[]): ClubState {
+  let next = state;
+  for (const uid of uids) next = removeItem(next, uid).state;
+  return next;
+}
+
 /** Sell an object from the room. `refund` false is used internally while picking something up to move it. */
 export function removeItem(state: ClubState, uid: string, refund = true): Result {
   const it = state.items.find((i) => i.uid === uid);
@@ -509,6 +593,15 @@ export function soundSystem(state: ClubState): number {
 }
 
 /** Rebuild a saved/imported club, dropping anything the rules reject (never trusts the input). */
+/** A loan from a saved game or the network: numbers only, never negative, sensible sizes. */
+export function sanitizeLoan(raw: unknown): Loan | null {
+  const l = raw as Partial<Loan> | null;
+  if (!l || typeof l !== 'object' || typeof l.id !== 'string') return null;
+  const n = (v: unknown, max = 1e12) => (Number.isFinite(v) ? Math.min(Math.max(Math.floor(v as number), 0), max) : 0);
+  if (!(n(l.owed) > 0)) return null;
+  return { id: l.id.slice(0, 40), at: n(l.at, 1e15), principal: n(l.principal), fee: n(l.fee), owed: n(l.owed), installment: n(l.installment), due: n(l.due), cycle: n(l.cycle, 59), arrears: n(l.arrears, 1000), closed: l.closed === true };
+}
+
 export function sanitizeClub(raw: unknown): ClubState {
   const r = (raw ?? {}) as Partial<ClubState>;
   const base = newClub();
@@ -535,11 +628,15 @@ export function sanitizeClub(raw: unknown): ClubState {
       van: Math.min(nat(r.kits?.van, 0), 1),
       disguise: Math.min(nat(r.kits?.disguise, 0), 99),
     },
+    loan: sanitizeLoan(r.loan),
+    embargoed: (Array.isArray(r.embargoed) ? r.embargoed : []).slice(0, 5).filter((k) => k && typeof k.uid === 'string' && typeof k.id === 'string' && BY_ID.has(k.id)).map((k) => ({ uid: k.uid.slice(0, 30), id: k.id, tier: clampTier(k.tier) })),
+    badCreditUntil: Number.isFinite(r.badCreditUntil) ? Math.max(0, r.badCreditUntil as number) : 0,
     kept: (Array.isArray(r.kept) ? r.kept : []).slice(0, MAX_KEPT).filter((k) => k && typeof k.uid === 'string' && typeof k.id === 'string' && BY_ID.has(k.id)).map((k) => ({ uid: k.uid.slice(0, 30), id: k.id, tier: clampTier(k.tier) })),
     loot: (Array.isArray(r.loot) ? r.loot : []).slice(0, 20).filter((l) => l && typeof l.uid === 'string' && typeof l.id === 'string' && BY_ID.has(l.id)).map((l) => ({ uid: l.uid.slice(0, 30), id: l.id, tier: clampTier(l.tier), hotUntil: Number.isFinite(l.hotUntil) ? Math.max(0, l.hotUntil) : 0, from: Number.isInteger(l.from) ? l.from : -1 })),
-    reports: (Array.isArray(r.reports) ? r.reports : []).slice(0, 12).filter((x) => x && typeof x.id === 'string' && ['robbed', 'loot', 'police', 'income', 'fee', 'jail', 'refund'].includes(x.kind)).map((x) => ({
+    reports: (Array.isArray(r.reports) ? r.reports : []).slice(0, 12).filter((x) => x && typeof x.id === 'string' && ['robbed', 'loot', 'police', 'income', 'fee', 'jail', 'refund', 'bank'].includes(x.kind)).map((x) => ({
       id: x.id.slice(0, 40), at: nat(x.at, 0), kind: x.kind, by: Number.isInteger(x.by) ? x.by : -1, byName: typeof x.byName === 'string' ? x.byName.slice(0, 20) : '',
       cash: nat(x.cash, 0), pieces: Array.isArray(x.pieces) ? x.pieces.filter((p) => typeof p === 'string').slice(0, 5).map((p) => p.slice(0, 30)) : [], closedUntil: nat(x.closedUntil, 0),
+      ...(typeof x.event === 'string' ? { event: x.event.slice(0, 12) } : {}),
     })),
     reviews: (Array.isArray(r.reviews) ? r.reviews : []).slice(0, MAX_REVIEWS).filter((x) => x && typeof x.id === 'string' && typeof x.text === 'string').map((x) => ({
       id: x.id.slice(0, 40), at: nat(x.at, 0), stars: Math.min(5, Math.max(1, Math.round(Number(x.stars) || 3))), text: x.text.slice(0, 160), who: typeof x.who === 'string' ? x.who.slice(0, 24) : 'Un invitado',

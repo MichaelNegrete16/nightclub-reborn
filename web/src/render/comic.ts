@@ -466,6 +466,104 @@ const SHOTS: Record<string, ShotFn> = {
     r.cam([0.0, 2.7, 3.9], [0.0, 0.9, 0], 48);
   },
 
+  // the bank: Don Bruno at his desk, with the ledger and the stacks of coins
+  async bankdesk(r, env) {
+    r.bg('#140d0a', 8, 30);
+    r.lights(0xc9a56a, 0x2a1a10, 0.9, 0xffe2a8, 1.0, [-3, 6, 4]);
+    r.box(9, 4.6, 0.3, 0x3a2a20, [0, 0, -2.6]);
+    r.box(9, 0.2, 6, 0x4a3426, [0, -0.2, 0]);
+    r.add(neon('BANCO DEL RUIDO', '#f5b91d', 4.6, 0.9, true), [0, 3.4, -2.4]);
+    // the vault door behind
+    r.cyl(1.1, 1.1, 0.25, 0x8f96b4, [-2.8, 1.7, -2.4], 28).rotation.x = Math.PI / 2;
+    r.cyl(0.35, 0.35, 0.3, 0xf5b91d, [-2.8, 1.7, -2.2], 16).rotation.x = Math.PI / 2;
+    // the desk
+    r.box(4.4, 0.95, 1.4, 0x5a3a24, [0.4, 0, -0.6]);
+    r.box(4.5, 0.08, 1.5, 0x7a5236, [0.4, 0.95, -0.6]);
+    for (let i = 0; i < 4; i++) for (let k = 0; k <= i; k++) r.cyl(0.2, 0.2, 0.06, 0xf5b91d, [1.4 + i * 0.5, 1.03 + k * 0.06, -0.3 + (i % 2) * 0.1], 14);
+    r.box(0.9, 0.06, 0.6, 0xf4e6c4, [-0.6, 1.05, -0.2], 0.2); // the contract
+    r.point(0xffd480, 20, [0.4, 2.4, 0.4], 8);
+    await r.char(NPC_LOOKS.bruno, { x: 0.4, z: -1.4, ry: 0, pose: 'idle', s: 1.35 });
+    await r.char(env.player, { x: -1.2, z: 1.0, ry: Math.PI - 0.35, pose: 'idle', s: 1.35 });
+    r.dust(24, [4, 2, 2], [0, 1.6, 0.5], 7);
+    r.cam([0.6, 1.7, 4.6], [0.2, 1.2, -0.3], 48);
+  },
+
+  // the collector at the club's door, at night, with the bank's black van
+  async bankdoor(r, env) {
+    r.bg('#08061a', 10, 46);
+    r.lights(0x3a46b8, 0x120a24, 0.7, 0x9aa6ff, 0.8, [3, 8, 5]);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), toon(0x14143c, { outline: false }));
+    ground.rotation.x = -Math.PI / 2;
+    r.scene.add(ground);
+    r.box(10, 4.8, 0.7, 0x2a2540, [0, 0, -4.2]);
+    r.box(1.5, 2.5, 0.2, 0x1a1822, [0, 0, -3.8]);
+    r.box(1.2, 2.3, 0.1, 0x7a3b22, [0, 0, -3.7]);
+    r.add(neon('TU CLUB', '#ff4fa3', 3.4, 0.9, true), [0, 3.4, -3.8]);
+    // the van
+    r.box(3.0, 1.2, 1.4, 0x15151d, [-3.6, 0.2, -1.2], 0.3);
+    r.box(1.4, 0.8, 1.3, 0x22222e, [-2.6, 0.6, -1.0], 0.3);
+    r.add(neon('BANCO', '#f5b91d', 1.4, 0.4, true), [-3.5, 1.5, -0.7], 0.3);
+    r.point(0xfff1b0, 10, [-2.3, 0.9, -0.4], 6);
+    await r.char(NPC_LOOKS.bruno, { x: 0.9, z: 0.5, ry: -0.5, pose: 'idle', s: 1.35 });
+    r.suitcase([1.6, 0, 0.9], -0.4);
+    await r.char(env.player, { x: -0.5, z: -2.4, ry: 0.2, pose: 'idle', s: 1.35 });
+    r.rain(200, [8, 8, 10], [0, 3, 1], 12);
+    r.cam([0.3, 1.3, 4.4], [0.1, 1.2, -1.0], 50);
+  },
+
+  // the embargo: movers carry the pieces to the van, each with a red seal. arg = "piece,piece"
+  async embargo(r, env) {
+    const pieces = (env.arg ?? '').split(',').filter(Boolean).slice(0, 3);
+    r.bg('#0a0818', 8, 36);
+    r.lights(0x6a76c8, 0x180f2c, 0.8, 0xdfe6ff, 0.9, [0, 8, 4]);
+    r.box(9, 4.2, 0.3, 0x2a2540, [0, 0, -2.4]);
+    r.box(9, 0.2, 6, 0x1a1826, [0, -0.2, 0]);
+    // the van with its back open
+    r.box(3.2, 1.6, 2.0, 0x15151d, [2.6, 0.0, -1.0]);
+    r.box(2.6, 1.3, 0.1, 0x0a0a10, [2.6, 0.15, 0.02]);
+    r.add(neon('BANCO DEL RUIDO', '#f5b91d', 2.6, 0.5, true), [2.6, 2.0, 0.05]);
+    // the pieces, each with a big red seal
+    pieces.forEach((id, i) => {
+      const x = -2.4 + i * 1.5;
+      r.prop(id, [x, 0, 0.2], (i % 2 ? 0.3 : -0.25), 1.2);
+      const seal = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.3), new THREE.MeshBasicMaterial({ map: canvasTexture(256, 80, (g) => { g.fillStyle = '#d6314a'; g.fillRect(0, 0, 256, 80); g.fillStyle = '#fff'; g.font = '900 44px "Arial Black", Impact, sans-serif'; g.textAlign = 'center'; g.fillText('EMBARGADO', 128, 56); }) }));
+      seal.position.set(x, 1.3, 0.7);
+      r.scene.add(seal);
+    });
+    r.box(7, 0.1, 0.05, 0xd6314a, [-0.3, 0.9, 1.1]); // a red tape across them
+    await r.char(NPC_LOOKS.bruno, { x: 0.5, z: 1.2, ry: -0.7, pose: 'idle', s: 1.35 });
+    await r.char(env.player, { x: -3.6, z: 1.6, ry: 0.6, pose: 'idle', s: 1.3 });
+    r.beam(0xffffff, [0, 5, 2], [-0.8, 0.5, 0.5], 1.9, 0.1);
+    r.dust(24, [5, 2, 2], [0, 1.4, 0.8], 4);
+    r.cam([0.0, 1.7, 5.0], [0.0, 1.0, 0.2], 50);
+  },
+
+  // the closure: chains and a red seal on the door
+  async shut(r, env) {
+    r.bg('#08061a', 10, 46);
+    r.lights(0x3a46b8, 0x120a24, 0.7, 0x9aa6ff, 0.7, [3, 8, 5]);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), toon(0x14143c, { outline: false }));
+    ground.rotation.x = -Math.PI / 2;
+    r.scene.add(ground);
+    r.box(10, 4.8, 0.7, 0x2a2540, [0, 0, -4.2]);
+    r.box(1.9, 2.7, 0.2, 0x1a1822, [0, 0, -3.8]);
+    r.box(1.6, 2.5, 0.1, 0x7a3b22, [0, 0, -3.7]);
+    r.add(neon('TU CLUB', '#5a5a6a', 3.4, 0.9, false), [0, 3.4, -3.8]);
+    // chains across the door and a padlock
+    for (const [y, rot] of [[0.8, 0.5], [1.6, -0.5]] as const) r.box(2.2, 0.1, 0.1, 0x8f96b4, [0, y, -3.55]).rotation.z = rot;
+    r.box(0.4, 0.5, 0.2, 0xf5b91d, [0, 1.2, -3.45]);
+    // the big banner
+    const banner = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), new THREE.MeshBasicMaterial({ map: canvasTexture(640, 160, (g) => { g.fillStyle = '#d6314a'; g.fillRect(0, 0, 640, 160); g.strokeStyle = '#fff'; g.lineWidth = 8; g.strokeRect(8, 8, 624, 144); g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '900 46px "Arial Black", Impact, sans-serif'; g.fillText('CLAUSURADO', 320, 76); g.font = '900 30px "Arial Black", Impact, sans-serif'; g.fillText('POR EL BANCO DEL RUIDO', 320, 124); }) }));
+    banner.position.set(0, 2.2, -3.4);
+    banner.rotation.z = -0.06;
+    r.scene.add(banner);
+    r.point(0xff3050, 14, [0, 2, -2], 8);
+    await r.char(NPC_LOOKS.bruno, { x: 1.5, z: 0.6, ry: -0.5, pose: 'idle', s: 1.35 });
+    await r.char(env.player, { x: -0.8, z: 1.2, ry: 0.3, pose: 'idle', s: 1.35 });
+    r.rain(160, [8, 8, 10], [0, 3, 1], 12);
+    r.cam([0.2, 1.4, 4.6], [0.1, 1.3, -1.0], 50);
+  },
+
   // the cell
   async cell(r, env) {
     r.bg('#07060f', 6, 24);

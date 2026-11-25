@@ -24,6 +24,29 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-25t',
+    date: '25 de noviembre de 2026',
+    title: 'Mover por bloques y sofás donde sí se sienta la gente',
+    intro: 'Ya no hay que mover las baldosas de una en una.',
+    entries: [
+      { kind: 'icon', ref: 'move', title: 'Seleccionar y mover por bloques', text: 'Pulsa el botón de seleccionar (el cuadrito punteado a la derecha), toca una esquina de la zona y luego la esquina contraria: se seleccionan todas las piezas de adentro (por defecto solo los suelos, o todo si prefieres). Luego «Mover todo» y haz clic donde quieras el bloque: se mueve entero, con su forma y sus mejoras. También puedes guardarlo o venderlo todo junto. Esc cancela.', where: 'Botón de seleccionar, en el club' },
+      { kind: 'item', ref: 'dj_booth_pro', title: 'El DJ va a la mejor cabina', text: 'Si tienes dos cabinas, tu primer DJ trabaja en la profesional y el segundo en la normal (cada cabina necesita el suyo). Y si la cabina queda pegada a una pared, el DJ se para a un lado o al frente en vez de quedarse sin puesto.', where: 'Oficina › Tu equipo' },
+      { kind: 'item', ref: 'sofa_corner', title: 'Nadie se sienta en el aire', text: 'En el sofá de esquina y en el reservado, un invitado se sentaba en la esquina donde no hay cojín (o sobre la mesa). Ahora usan solo los asientos de verdad, sea cual sea la rotación.', where: 'Sofás y reservados' },
+    ],
+  },
+  {
+    id: '2026-11-25s',
+    date: '25 de noviembre de 2026',
+    title: 'Llega el Banco del Ruido',
+    intro: 'Pide plata prestada para comprar antes y págala por horas.',
+    entries: [
+      { kind: 'icon', ref: 'coin', title: 'Préstamos desde el nivel 15', text: 'Elige cuánto pedir (hasta un tope que crece con tu nivel). Pagas una comisión fija del 15% y lo devuelves en 12 cuotas, una por cada hora de juego. Sin intereses que se disparen.', where: 'Oficina › Banco › Abrir el banco' },
+      { kind: 'icon', ref: 'lock', title: 'Qué pasa si no pagas', text: 'Si no alcanza la cuota queda atrasada. A las 3 horas: recargo y mal crédito por 2 días. A las 6: embargo de tu pieza más valiosa que no sea esencial (vuelve cuando termines de pagar). A las 10: el banco clausura tu club hasta que te pongas al día. Nunca pierdes la cuenta ni tus objetos para siempre.', where: 'Oficina › Banco' },
+      { kind: 'icon', ref: 'star', title: 'Conoce a Don Bruno', text: 'El cobrador del banco aparece en escenas de cómic: cuando te aprueban tu primer préstamo, cuando llegas a la mora, cuando te embarga una pieza (la ves con su sello rojo) y cuando clausura tu club.', where: 'Cuando el banco actúa' },
+      { kind: 'icon', ref: 'check', title: 'Justo con el reloj', text: 'Una hora son 60 minutos con el servidor encendido: si está apagado, o estás en prisión, el reloj del banco se detiene. Pagar todo antes te perdona la mitad de la comisión que quede.', where: 'Banco' },
+    ],
+  },
+  {
     id: '2026-11-25r',
     date: '25 de noviembre de 2026',
     title: 'Más empleados y botones que responden',

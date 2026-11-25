@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BOOTH_IDS, BY_ID, type ItemDef } from '../core/catalog';
 import {
   PARCEL, PHASES, YARD, blockedSet, buyItem, doorCells, setOpen as setClubOpen, footprint, levelNow, newClub, owned, phaseOf, placeItem, removeItem, sellFromInventory,
-  sellKept, sellValue, setPhase, stashItem, validatePlacement, type ClubState, type PlaceMode, type PlacedItem, type Rot,
+  groupValue, itemsInRect, moveGroup, sellGroup, sellKept, sellValue, setPhase, stashGroup, stashItem, validatePlacement, type ClubState, type PlaceMode, type PlacedItem, type Rot,
 } from '../core/club';
 import { applyEvents } from '../core/game';
 import { GuestSim, VIP_CHECK_COST, type GuestEvent, type Vip } from '../core/guests';
@@ -63,7 +63,11 @@ export type ViewMode = 'inside' | 'outside';
 
 export type Tool =
   | { kind: 'select' }
-  | { kind: 'place'; defId: string; rot: Rot; mode: PlaceMode; moveFrom?: PlacedItem; fromLoot?: string; fromKept?: string };
+  | { kind: 'place'; defId: string; rot: Rot; mode: PlaceMode; moveFrom?: PlacedItem; fromLoot?: string; fromKept?: string }
+  /** picking a rectangle of the floor: `a` is the first corner once it is chosen */
+  | { kind: 'area'; a?: { x: number; y: number } }
+  /** moving the selected pieces together */
+  | { kind: 'group'; uids: string[] };
 
 /** What the game UI wants to hear about. The view never touches the UI directly. */
 export interface ClubHooks {
@@ -82,10 +86,16 @@ export interface ClubHooks {
   onVip(vip: { id: number; vip: Vip } | null): void;
   /** the Brigada took the player to prison: play the arrest scene */
   onJail(letter: import('../core/mail').Mail): void;
+  /** the bank did something that has a scene (a loan, mora, embargo, closure) */
+  onBank?(letter: import('../core/mail').Mail): void;
   /** the player went out to the street or came back in */
   onMode(mode: ViewMode): void;
 }
 
+const SEL_GEO = new THREE.PlaneGeometry(1, 1);
+const SEL_MAT = new THREE.MeshBasicMaterial({ color: 0xf5b91d, transparent: true, opacity: 0.5, depthWrite: false });
+SEL_MAT.userData.outlineParameters = { visible: false };
+const GHOST_GEO = new THREE.BoxGeometry(1, 1, 1);
 const GHOST_OK = new THREE.MeshBasicMaterial({ color: 0x35f08a, transparent: true, opacity: 0.55, depthWrite: false });
 const GHOST_BAD = new THREE.MeshBasicMaterial({ color: 0xff3d55, transparent: true, opacity: 0.55, depthWrite: false });
 GHOST_OK.userData.outlineParameters = { visible: false };
@@ -135,6 +145,15 @@ export class ClubView {
   private wallN = new THREE.Group();
   private wallW = new THREE.Group();
   private highlight: THREE.Mesh;
+  /** several pieces selected at once (an area, a whole dance floor), by uid */
+  selection: string[] = [];
+  /** what an area picks: just the floor tiles, or everything inside */
+  areaFilter: 'floors' | 'all' = 'floors';
+  private selHi = new THREE.Group();
+  private areaRect: THREE.LineLoop | null = null;
+  private groupGhost: THREE.Group | null = null;
+  private groupAt: { dx: number; dy: number; ok: boolean } | null = null;
+  private groupHover: { x: number; y: number } | null = null;
   private ghost: THREE.Group | null = null;
   private ghostKey = '';
   private hover: { x: number; y: number } | null = null;
@@ -220,6 +239,7 @@ export class ClubView {
     this.highlight.position.y = 0.06;
     this.highlight.visible = false;
     s.add(this.highlight);
+    s.add(this.selHi);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableRotate = false;
@@ -752,6 +772,8 @@ export class ClubView {
   }
 
   cancelTool(notify = true): void {
+    if (this.tool.kind === 'area') this.hideAreaRect();
+    if (this.tool.kind === 'group') this.hideGroupGhost();
     if (this.tool.kind === 'place' && this.tool.moveFrom && this.moveSnapshot) {
       this.state = this.moveSnapshot; // moving was cancelled: put the item back where it was
       this.moveSnapshot = null;
@@ -888,6 +910,26 @@ export class ClubView {
           this.hooks.onJail(m);
           this.hooks.onToast(`¡La Brigada encontró piezas robadas en tu club${took ? ` (${took})` : ''}! Vas a prisión: haz ${m.chores ?? 20} tareas para salir.`, 'bad');
         } else this.hooks.onToast(`La Brigada del Ruido pasó por tu club${took ? `: se llevó ${took}` : ''}.${shut}`, 'bad');
+      } else if (m.kind === 'bank' && m.bank) {
+        const b = m.bank;
+        const money = Math.abs(b.delta).toLocaleString('es-CO');
+        const owed = (b.loan?.owed ?? 0).toLocaleString('es-CO');
+        const line: Record<string, [string, 'ok' | 'bad']> = {
+          granted: [`El banco te prestó ${money} monedas. Debes ${owed} en 12 cuotas por hora.`, 'ok'],
+          late: [`No alcanzó para la cuota del banco. Debes ponerte al día: ${(b.loan?.due ?? 0).toLocaleString('es-CO')}.`, 'bad'],
+          mora: ['Estás en mora: recargo y mal crédito por 2 días. Si sigues sin pagar, el banco embarga.', 'bad'],
+          embargo: [`El banco embargó ${b.taken.map((p) => BY_ID.get(p.id)?.name ?? p.id).join(', ') || 'una pieza'}. Vuelve a tu bolsa cuando termines de pagar.`, 'bad'],
+          closure: ['El banco clausuró tu club hasta que pagues lo que debes.', 'bad'],
+          reopened: ['Te pusiste al día: el banco levantó la clausura. Ya puedes abrir.', 'ok'],
+          repaid: [`Pagaste toda la deuda de una vez (${money}). ¡Gracias por la visita!`, 'ok'],
+          paid: ['Terminaste de pagar el préstamo. Tu crédito queda limpio.', 'ok'],
+        };
+        const t = line[b.event];
+        if (t) this.hooks.onToast(t[0], t[1]);
+        // the scenes: the first loan once, the bad news every time
+        const first = b.event === 'granted' && !this.state.story.seen.includes('bank-granted');
+        if (first) this.patchState((s) => ({ ...s, story: { ...s.story, seen: [...s.story.seen, 'bank-granted'] } }));
+        if (first || ['mora', 'embargo', 'closure'].includes(b.event)) this.hooks.onBank?.(m);
       } else if (m.kind === 'fee') {
         this.hooks.onToast(`Pagaste ${m.cash.toLocaleString('es-CO')} monedas: ${m.byName}.`, 'ok');
       } else if (m.kind === 'jail') {
@@ -1097,6 +1139,8 @@ export class ClubView {
   /** talks to the server about robberies (set by main) */
   heistApi: import('../ui/heist').HeistApi | null = null;
   launder: (uid: string) => void = () => {};
+  /** ask the bank for a loan / pay it (set by main) */
+  bankOp: (op: 'loan' | 'repay', amount: number | 'all') => void = () => {};
 
   /** Buy a robbery kit from Zeta. */
   buyKit(kit: Kit): string | undefined {
@@ -1212,8 +1256,9 @@ export class ClubView {
   private afterToolChange(): void {
     this.refreshGhost();
     this.refreshHighlight();
-    this.grid.visible = this.tool.kind === 'place';
+    this.grid.visible = this.tool.kind === 'place' || this.tool.kind === 'area' || this.tool.kind === 'group';
     this.plotLines.visible = this.tool.kind === 'place';
+    this.refreshSelectionHi();
     const placing = this.tool.kind === 'place';
     if (placing && !this.zoomedForPlacing) {
       this.zoomedForPlacing = true;
@@ -1343,6 +1388,7 @@ export class ClubView {
     // Picking runs between frames: refresh world matrices now so a click right after an edit hits the new layout.
     this.items.updateMatrixWorld(true);
     mergeStatic(this.items, this.itemsBatch);
+    this.refreshSelectionHi();
     this.rebuildStaff();
   }
 
@@ -1975,6 +2021,189 @@ export class ClubView {
     return this.raycaster.ray.intersectPlane(this.ground, out) ? out : null;
   }
 
+  /** The floor cell under the pointer (for areas and groups, which are not tied to one piece's size). */
+  private groundCell(e: PointerEvent): { x: number; y: number } | null {
+    const p = this.worldPoint(e);
+    return p ? { x: Math.floor(p.x), y: Math.floor(p.z) } : null;
+  }
+
+  // ---- selecting and moving many pieces (a whole dance floor) --------------------------------
+  /** Start picking an area: two taps (opposite corners) select what is inside. */
+  startArea(): void {
+    this.goInsideNow();
+    this.cancelTool(false);
+    this.selectedUid = null;
+    this.selection = [];
+    this.tool = { kind: 'area' };
+    this.message = 'Toca una esquina de la zona';
+    this.afterToolChange();
+    this.onChange();
+  }
+
+  setAreaFilter(f: 'floors' | 'all'): void {
+    this.areaFilter = f;
+    this.onChange();
+  }
+
+  clearSelection(notify = true): void {
+    this.selection = [];
+    this.refreshSelectionHi();
+    if (notify) this.onChange();
+  }
+
+  selectionValue(): number {
+    return groupValue(this.state, this.selection);
+  }
+
+  /** Pick the selected pieces up to put them down somewhere else, all together. */
+  startGroupMove(): void {
+    if (!this.selection.length) return;
+    this.cancelTool(false);
+    this.tool = { kind: 'group', uids: [...this.selection] };
+    this.groupHover = null;
+    this.groupAt = null;
+    this.buildGroupGhost();
+    this.message = 'Elige dónde poner el bloque (el cursor es su centro)';
+    this.afterToolChange();
+    this.onChange();
+  }
+
+  stashSelection(): void {
+    const r = stashGroup(this.state, this.selection);
+    if (!r.done) return this.say(r.error ?? 'No se pudo guardar');
+    this.commit(r.state);
+    this.selection = [];
+    this.refreshSelectionHi();
+    this.say(r.skipped ? `Guardé ${r.done}; ${r.skipped} no se pudieron guardar` : `${r.done} ${r.done === 1 ? 'pieza guardada' : 'piezas guardadas'}`);
+  }
+
+  sellSelection(): void {
+    const value = this.selectionValue();
+    const n = this.selection.length;
+    this.commit(sellGroup(this.state, this.selection));
+    this.selection = [];
+    this.refreshSelectionHi();
+    this.say(`${n} ${n === 1 ? 'pieza vendida' : 'piezas vendidas'} por ${value.toLocaleString('es-CO')} monedas`);
+  }
+
+  private selBounds(uids: readonly string[]): { x0: number; y0: number; x1: number; y1: number } | null {
+    let b: { x0: number; y0: number; x1: number; y1: number } | null = null;
+    for (const it of this.state.items) {
+      if (!uids.includes(it.uid)) continue;
+      const def = BY_ID.get(it.id);
+      if (!def) continue;
+      const fp = footprint(def, it.rot);
+      b = b ? { x0: Math.min(b.x0, it.x), y0: Math.min(b.y0, it.y), x1: Math.max(b.x1, it.x + fp.w - 1), y1: Math.max(b.y1, it.y + fp.d - 1) } : { x0: it.x, y0: it.y, x1: it.x + fp.w - 1, y1: it.y + fp.d - 1 };
+    }
+    return b;
+  }
+
+  private refreshSelectionHi(): void {
+    for (const c of [...this.selHi.children]) this.selHi.remove(c);
+    this.selection = this.selection.filter((uid) => this.state.items.some((i) => i.uid === uid));
+    for (const uid of this.selection) {
+      const it = this.state.items.find((i) => i.uid === uid)!;
+      const def = BY_ID.get(it.id);
+      if (!def) continue;
+      const fp = footprint(def, it.rot);
+      const m = new THREE.Mesh(SEL_GEO, SEL_MAT);
+      m.rotation.x = -Math.PI / 2;
+      m.scale.set(fp.w * 0.96, fp.d * 0.96, 1);
+      m.position.set(it.x + fp.w / 2, 0.1, it.y + fp.d / 2);
+      this.selHi.add(m);
+    }
+  }
+
+  private refreshAreaRect(): void {
+    this.hideAreaRect();
+    if (this.tool.kind !== 'area' || !this.tool.a || !this.hover) return;
+    const a = this.tool.a;
+    const x0 = Math.min(a.x, this.hover.x);
+    const y0 = Math.min(a.y, this.hover.y);
+    const w = Math.abs(a.x - this.hover.x) + 1;
+    const h = Math.abs(a.y - this.hover.y) + 1;
+    this.areaRect = rectLine(x0, y0, w, h, 0xf5b91d, 1, 0.12);
+    this.scene.add(this.areaRect);
+  }
+
+  private hideAreaRect(): void {
+    if (!this.areaRect) return;
+    this.scene.remove(this.areaRect);
+    this.areaRect.geometry.dispose();
+    this.areaRect = null;
+  }
+
+  private buildGroupGhost(): void {
+    this.hideGroupGhost();
+    if (this.tool.kind !== 'group') return;
+    const g = new THREE.Group();
+    for (const uid of this.tool.uids) {
+      const it = this.state.items.find((i) => i.uid === uid);
+      const def = it && BY_ID.get(it.id);
+      if (!it || !def) continue;
+      const fp = footprint(def, it.rot);
+      const m = new THREE.Mesh(GHOST_GEO, GHOST_OK);
+      m.scale.set(fp.w * 0.96, def.layer === 'floor' ? 0.14 : 0.5, fp.d * 0.96);
+      m.position.set(it.x + fp.w / 2, def.layer === 'floor' ? 0.1 : 0.3, it.y + fp.d / 2);
+      g.add(m);
+    }
+    g.visible = false;
+    this.groupGhost = g;
+    this.scene.add(g);
+  }
+
+  private hideGroupGhost(): void {
+    if (!this.groupGhost) return;
+    this.scene.remove(this.groupGhost);
+    this.groupGhost = null;
+    this.groupAt = null;
+  }
+
+  /** Where the block would land with the pointer at its centre, and whether it fits there. */
+  private groupTarget(): { dx: number; dy: number } | null {
+    if (this.tool.kind !== 'group' || !this.groupHover) return null;
+    const b = this.selBounds(this.tool.uids);
+    if (!b) return null;
+    const w = b.x1 - b.x0 + 1;
+    const h = b.y1 - b.y0 + 1;
+    return { dx: this.groupHover.x - Math.floor(w / 2) - b.x0, dy: this.groupHover.y - Math.floor(h / 2) - b.y0 };
+  }
+
+  private refreshGroupGhost(): void {
+    const g = this.groupGhost;
+    const t = this.groupTarget();
+    if (!g || !t || this.tool.kind !== 'group') {
+      if (g) g.visible = false;
+      return;
+    }
+    if (!this.groupAt || this.groupAt.dx !== t.dx || this.groupAt.dy !== t.dy) {
+      const r = moveGroup(this.state, this.tool.uids, t.dx, t.dy);
+      const ok = !r.error;
+      this.groupAt = { ...t, ok };
+      g.position.set(t.dx, 0, t.dy);
+      for (const c of g.children) (c as THREE.Mesh).material = ok ? GHOST_OK : GHOST_BAD;
+      if (!ok && r.error && this.message !== r.error) this.message = r.error;
+      else if (ok && this.message) this.message = '';
+      this.onChange();
+    }
+    g.visible = true;
+  }
+
+  private commitGroup(): void {
+    if (this.tool.kind !== 'group') return;
+    const t = this.groupTarget();
+    if (!t) return;
+    const r = moveGroup(this.state, this.tool.uids, t.dx, t.dy);
+    if (r.error) return this.say(r.error);
+    const n = this.tool.uids.length;
+    this.hideGroupGhost();
+    this.tool = { kind: 'select' };
+    this.commit(r.state);
+    this.refreshSelectionHi();
+    this.afterToolChange();
+    this.say(`${n} ${n === 1 ? 'pieza movida' : 'piezas movidas'}`);
+  }
+
   private cellFor(e: PointerEvent): { x: number; y: number } | null {
     if (this.tool.kind !== 'place') return null;
     const p = this.worldPoint(e);
@@ -1993,6 +2222,16 @@ export class ClubView {
     if (!this.enabled) return;
     if (this.down && Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 6) return; // dragging = panning
     if (e.pointerType === 'touch') return; // touch uses tap-to-preview, handled on up
+    if (this.tool.kind === 'area') {
+      this.hover = this.groundCell(e);
+      this.refreshAreaRect();
+      return;
+    }
+    if (this.tool.kind === 'group') {
+      this.groupHover = this.groundCell(e);
+      this.refreshGroupGhost();
+      return;
+    }
     this.setHover(this.cellFor(e));
   }
 
@@ -2002,6 +2241,39 @@ export class ClubView {
     const moved = Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y);
     this.down = null;
     if (moved > 6 || e.button === 2) return; // it was a pan, or a right click
+    if (this.tool.kind === 'area') {
+      const cell = this.groundCell(e);
+      if (!cell) return;
+      this.hover = cell;
+      if (!this.tool.a) {
+        this.tool = { kind: 'area', a: cell };
+        this.message = 'Ahora toca la esquina contraria';
+        this.refreshAreaRect();
+        return this.onChange();
+      }
+      const a = this.tool.a;
+      const found = itemsInRect(this.state, a.x, a.y, cell.x, cell.y, this.areaFilter === 'floors');
+      this.hideAreaRect();
+      this.tool = { kind: 'select' };
+      this.selection = found.map((i) => i.uid);
+      this.selectedUid = null;
+      this.message = found.length ? `${found.length} ${found.length === 1 ? 'pieza seleccionada' : 'piezas seleccionadas'}` : 'No encontré piezas en esa zona';
+      this.afterToolChange();
+      return this.onChange();
+    }
+    if (this.tool.kind === 'group') {
+      const cell = this.groundCell(e);
+      if (!cell) return;
+      if (e.pointerType === 'touch') {
+        const same = this.groupHover && this.groupHover.x === cell.x && this.groupHover.y === cell.y;
+        if (!same) {
+          this.groupHover = cell;
+          return this.refreshGroupGhost(); // first tap previews, second tap on the same cell confirms
+        }
+      }
+      this.groupHover = cell;
+      return this.commitGroup();
+    }
     if (this.tool.kind === 'place') {
       const cell = this.cellFor(e);
       if (!cell) return;
@@ -2066,6 +2338,7 @@ export class ClubView {
       }
     }
     this.selectedUid = uid;
+    if (this.selection.length) this.clearSelection(false); // picking one piece drops the group
     this.refreshHighlight();
     this.onChange();
     if (!uid) this.clickGround(e); // empty floor: the character walks there

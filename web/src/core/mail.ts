@@ -3,6 +3,8 @@
 // Pure logic, used by both sides so they always agree.
 
 import type { ClubState } from './club.ts';
+import { sanitizeLoan } from './club.ts';
+import type { BankLetter } from './bank.ts';
 import type { Kit } from './heist.ts';
 
 export interface MailPiece {
@@ -17,7 +19,9 @@ export interface Mail {
   id: string;
   at: number;
   /** robbed: something was taken from my club · loot: what I took in a robbery of mine (or what I spent trying) */
-  kind: 'robbed' | 'loot' | 'police' | 'income' | 'fee' | 'jail' | 'refund';
+  kind: 'robbed' | 'loot' | 'police' | 'income' | 'fee' | 'jail' | 'refund' | 'bank';
+  /** bank: what happened with the loan and how it stands now */
+  bank?: BankLetter;
   /** income: how many minutes the club worked while the player was away */
   minutes?: number;
   /** jail: what was taken (cash), how the thief was found out, and which piece they went for */
@@ -51,6 +55,26 @@ export function applyMail(state: ClubState, mail: readonly Mail[]): ClubState {
       next = { ...next, coins: Math.max(0, next.coins - m.cash), open: m.kind === 'jail' && (m.closedUntil ?? 0) > m.at ? false : next.open, reports: [rep, ...next.reports].slice(0, 12) };
       continue;
     }
+    if (m.kind === 'bank' && m.bank) {
+      // the bank's books: the loan as the server keeps it, the cash that moved, the pieces held or given back
+      const b = m.bank;
+      const gone = new Set(b.taken.map((p) => p.uid));
+      const kept = [...next.kept, ...b.returned.filter((p) => !next.kept.some((k) => k.uid === p.uid))];
+      const rep = { id: m.id, at: m.at, kind: 'bank' as const, by: -1, byName: m.byName, cash: Math.abs(b.delta), pieces: b.taken.map((p) => p.id), closedUntil: 0, event: b.event };
+      next = {
+        ...next,
+        coins: Math.max(0, next.coins + b.delta),
+        loan: b.loan,
+        embargoed: b.embargoed,
+        badCreditUntil: b.badUntil,
+        kept,
+        items: next.items.filter((i) => !gone.has(i.uid)),
+        open: b.event === 'closure' ? false : next.open,
+        // routine hourly payments replace the previous one in the log, so they do not push the robberies out (a letter is still never applied twice)
+        reports: [rep, ...next.reports.filter((r) => !(b.event === 'payment' && r.kind === 'bank' && r.event === 'payment'))].slice(0, 12),
+      };
+      continue;
+    }
     if (m.kind === 'refund') {
       // money given back (a punishment that should not have been)
       const rep = { id: m.id, at: m.at, kind: 'refund' as const, by: -1, byName: m.byName, cash: m.cash, pieces: [] as string[], closedUntil: 0 };
@@ -82,13 +106,31 @@ export function applyMail(state: ClubState, mail: readonly Mail[]): ClubState {
   return next;
 }
 
+const EVENTS = ['granted', 'payment', 'late', 'mora', 'embargo', 'closure', 'reopened', 'repaid', 'paid'];
+const cleanPieces = (v: unknown): BankLetter['taken'] =>
+  (Array.isArray(v) ? v : []).slice(0, 5).filter((p) => p && typeof p.uid === 'string' && typeof p.id === 'string').map((p) => ({ uid: p.uid.slice(0, 30), id: p.id.slice(0, 30), tier: Math.min(4, Math.max(1, Math.floor(Number(p.tier) || 1))) as 1 | 2 | 3 | 4 }));
+
+function cleanBank(raw: unknown): BankLetter | undefined {
+  const b = raw as Partial<BankLetter> | null;
+  if (!b || typeof b !== 'object' || typeof b.event !== 'string' || !EVENTS.includes(b.event)) return undefined;
+  return {
+    event: b.event,
+    delta: Number.isFinite(b.delta) ? Math.max(-1e12, Math.min(1e12, Math.round(b.delta as number))) : 0,
+    loan: sanitizeLoan(b.loan),
+    embargoed: cleanPieces(b.embargoed),
+    badUntil: Number.isFinite(b.badUntil) ? Math.max(0, b.badUntil as number) : 0,
+    taken: cleanPieces(b.taken),
+    returned: cleanPieces(b.returned),
+  };
+}
+
 /** Keep only well-formed letters (they come from the network). */
 export function cleanMail(raw: unknown): Mail[] {
   if (!Array.isArray(raw)) return [];
   const out: Mail[] = [];
   for (const m of raw.slice(0, 50)) {
     const x = m as Partial<Mail>;
-    if (!x || typeof x.id !== 'string' || (x.kind !== 'robbed' && x.kind !== 'loot' && x.kind !== 'police' && x.kind !== 'income' && x.kind !== 'fee' && x.kind !== 'jail' && x.kind !== 'refund')) continue;
+    if (!x || typeof x.id !== 'string' || (x.kind !== 'robbed' && x.kind !== 'loot' && x.kind !== 'police' && x.kind !== 'income' && x.kind !== 'fee' && x.kind !== 'jail' && x.kind !== 'refund' && x.kind !== 'bank')) continue;
     out.push({
       id: x.id.slice(0, 40),
       at: Number.isFinite(x.at) ? (x.at as number) : 0,
@@ -98,6 +140,7 @@ export function cleanMail(raw: unknown): Mail[] {
       ...(Number.isFinite(x.chores) ? { chores: Math.max(0, Math.min(Math.floor(x.chores as number), 200)) } : {}),
       ...(x.story === 'caught' || x.story === 'convicted' || x.story === 'raid' ? { story: x.story } : {}),
       ...(Number.isFinite(x.minutes) ? { minutes: Math.max(0, Math.min(Math.floor(x.minutes as number), 100000)) } : {}),
+      ...(x.kind === 'bank' ? { bank: cleanBank(x.bank) } : {}),
       kitsUsed: Array.isArray(x.kitsUsed) ? (x.kitsUsed.filter((k) => ['picks', 'jammer', 'van', 'disguise'].includes(k as string)) as Kit[]).slice(0, 4) : undefined,
       by: Number.isInteger(x.by) ? (x.by as number) : -1,
       byName: typeof x.byName === 'string' ? x.byName.slice(0, 20) : '',

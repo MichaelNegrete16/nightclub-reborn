@@ -893,5 +893,65 @@ await test('accounts: a passkey protects a club, other devices join with a code,
   await s.close();
 });
 
+await test('the bank on the server: the books are the server\'s, installments run only while it is up, a prisoner\'s clock waits, closure follows the debt', async () => {
+  const s = await createServer({ port: 0, dataFile: null, audioDir: null, saveEveryMs: 0 });
+  const base = `http://127.0.0.1:${s.port}`;
+  const P = 'player-bank-00001';
+  const c = client(s.port, P, 'Deudor');
+  await c.ready;
+  const { lend, payback, bankTick } = await import('./bank.mjs');
+  const NOW = Date.UTC(2026, 10, 30, 12, 0, 0);
+  const g = { ...newClub(), xp: 3_500_000, coins: 5000, phase: 3, open: true };
+  await fetch(`${base}/save?pid=${P}`, { method: 'POST', body: JSON.stringify(g) });
+  const letters = [];
+  const deliver = (id, l) => { letters.push(l); s.deliver(id, l); };
+
+  assert.match(lend(s.world, s.saves, P, 100, deliver, NOW).error, /mínimo/);
+  const got = lend(s.world, s.saves, P, 30_000, deliver, NOW);
+  assert.equal(got.ok, true);
+  assert.equal(s.saves.read(P).state.coins, 5000 + 30_000);
+  assert.equal(letters[0].kind, 'bank');
+  assert.equal(letters[0].bank.event, 'granted');
+  assert.equal(letters[0].bank.delta, 30_000);
+  assert.match(lend(s.world, s.saves, P, 5000, deliver, NOW).error, /Ya tienes/);
+
+  // the game cannot erase the debt by uploading a copy without it
+  const cheat = applyMail(g, letters); // what an honest game looks like after the letter...
+  await fetch(`${base}/save?pid=${P}`, { method: 'POST', body: JSON.stringify({ ...cheat, loan: null }) });
+  assert.ok(s.saves.read(P).state.loan, 'the loan is still there');
+  assert.equal(s.saves.read(P).state.loan.owed, got.loan.owed);
+
+  // 59 minutes: nothing; the 60th collects the first installment
+  for (let i = 0; i < 59; i++) bankTick(s.world, s.saves, deliver, NOW + i * 60_000);
+  assert.equal(letters.length, 1, 'nothing happens inside the hour');
+  bankTick(s.world, s.saves, deliver, NOW + 59 * 60_000);
+  assert.equal(letters.length, 2);
+  assert.equal(letters[1].bank.event, 'payment');
+  assert.equal(s.saves.read(P).state.loan.owed, got.loan.owed - got.loan.installment);
+
+  // in prison the clock waits
+  s.world.setCrime(P, { ...s.world.crimeOf(P), detainedUntil: NOW + 99 * 3_600_000 });
+  const cycle = s.saves.read(P).state.loan.cycle;
+  for (let i = 0; i < 5; i++) bankTick(s.world, s.saves, deliver, NOW + (60 + i) * 60_000);
+  assert.equal(s.saves.read(P).state.loan.cycle, cycle, 'the clock did not move');
+  s.world.setCrime(P, { ...s.world.crimeOf(P), detainedUntil: 0 });
+
+  // broke: the bank shuts the club after ten late hours, and the city's record follows; paying what is due opens it again
+  s.saves.update(P, (st) => ({ ...st, coins: 0 }), NOW);
+  let t = NOW + 200 * 60_000;
+  for (let i = 0; i < 12 * 60; i++) bankTick(s.world, s.saves, deliver, (t += 60_000));
+  const sv = s.saves.read(P).state;
+  assert.ok(sv.loan.closed, 'closed by the bank');
+  assert.ok(s.world.crimeOf(P).closedUntil > t + 100 * 86_400_000, 'the city keeps the club shut');
+  assert.ok(letters.some((l) => l.bank?.event === 'closure'));
+  s.saves.update(P, (st) => ({ ...st, coins: sv.loan.due + 5 }), t);
+  const reopened = payback(s.world, s.saves, P, sv.loan.due, deliver, t);
+  assert.equal(reopened.ok, true);
+  assert.equal(s.world.crimeOf(P).closedUntil, 0, 'the closure is lifted');
+  assert.match(payback(s.world, s.saves, 'player-nobody-0001', 'all', deliver, t).error, /partida/);
+  c.ws.close();
+  await s.close();
+});
+
 console.log(`\n${passed} tests passed`);
 process.exit(0);

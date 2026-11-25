@@ -18,6 +18,7 @@ import { caricature } from './caricature';
 import { openOffice } from './office';
 import { openMenu } from './menu';
 import { openAccount } from './account';
+import { bankScene } from '../core/bank-scenes';
 import { mountMinimap } from './minimap';
 import { openMusic } from './music';
 import { openUnlocks } from './unlocks';
@@ -91,6 +92,7 @@ export class GameUi {
     mk('rotate', 'Girar vista a la derecha (E)', () => club.rotateView(1));
     mk('center', 'Centrar la vista', () => club.resetView());
     mk('undo', 'Deshacer (Ctrl+Z)', () => club.undo());
+    mk('select', 'Seleccionar varias piezas (mover, guardar o vender un bloque)', () => club.startArea());
     mk('dance', 'Bailar (B)', () => openEmotes(this.ctx));
     const eye = mk('eye', 'Mostrar u ocultar invitados', () => club.toggleGuests());
     eye.dataset.role = 'guests';
@@ -128,6 +130,11 @@ export class GameUi {
     deps.club.onVisitChange = (v) => this.showVisit(v);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && deps.club.visiting) deps.club.leaveVisit();
+      if (e.key === 'Escape' && !modalOpen()) {
+        // leave whatever is half done: an area being picked, a block being moved, a selection
+        if (deps.club.tool.kind === 'area' || deps.club.tool.kind === 'group') deps.club.cancelTool();
+        else if (deps.club.selection.length) deps.club.clearSelection();
+      }
       // B opens the dances (not while typing in the chat or with a window open)
       const typing = (e.target as HTMLElement | null)?.tagName === 'INPUT';
       if ((e.key === 'b' || e.key === 'B') && !typing && !modalOpen() && !e.ctrlKey && !e.metaKey) openEmotes(this.ctx);
@@ -153,6 +160,7 @@ export class GameUi {
       onVip: (v) => this.showVip(v),
       onStar: (c, n) => this.showStar(c, n),
       onJail: (m) => void this.playArrest(m),
+      onBank: (m) => void this.playBank(m),
       onMode: () => this.refresh(),
     };
   }
@@ -250,6 +258,23 @@ export class GameUi {
   }
 
   /** The arrest scene: the Brigada takes the thief away, showing what was taken (or attempted), from whom and how. */
+  private async playBank(m: Mail): Promise<void> {
+    const scene = bankScene(m, this.deps.club.state.story.name || 'DJ');
+    if (!scene) return;
+    while (this.playing) await new Promise((r) => setTimeout(r, 1500));
+    this.playing = true;
+    try {
+      closeModals();
+      document.body.classList.add('in-scene');
+      this.deps.club.paused = true;
+      await playScene(scene, this.env());
+    } finally {
+      this.playing = false;
+      document.body.classList.remove('in-scene');
+      this.deps.club.paused = document.body.classList.contains('onboarding');
+    }
+  }
+
   private async playArrest(m: Mail): Promise<void> {
     while (this.playing) await new Promise((r) => setTimeout(r, 1500));
     this.playing = true;

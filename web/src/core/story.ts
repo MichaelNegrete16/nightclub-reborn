@@ -18,6 +18,7 @@ export const SPEAKERS: Record<string, Speaker> = {
   rosa: { name: 'Rosa', role: 'La reina de la barra' },
   zeta: { name: 'Zeta', role: 'Dueño de los clubes Eclipse' },
   ferro: { name: 'Comisario Ferro', role: 'Brigada del Ruido' },
+  bruno: { name: 'Don Bruno', role: 'Cobrador del Banco del Ruido' },
   you: { name: '{name}', role: 'Tú' },
 };
 

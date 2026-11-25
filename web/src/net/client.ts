@@ -188,6 +188,8 @@ export class Online {
   onScout: (r: ScoutReply) => void = () => {};
   onHeist: (r: HeistReply) => void = () => {};
   onLaunder: (r: { uid: string; ok: boolean; price?: number; error?: string }) => void = () => {};
+  /** the answer to a loan or a payment to the bank */
+  onBank: (r: { op: string; ok: boolean; error?: string }) => void = () => {};
   /** my crime record, kept by the server (read-only here) */
   onCrime: (c: CrimeView) => void = () => {};
   /** somebody nearby said something */
@@ -271,6 +273,7 @@ export class Online {
         else if (m.t === 'scout') this.onScout(m as ScoutReply);
         else if (m.t === 'heist') this.onHeist(m as HeistReply);
         else if (m.t === 'launder') this.onLaunder(m);
+        else if (m.t === 'bank') this.onBank({ op: String(m.op ?? ''), ok: m.ok === true, error: typeof m.error === 'string' ? m.error : undefined });
         else if (m.t === 'chat') this.onChat({ n: Number(m.n), name: String(m.name ?? ''), text: String(m.text ?? '').slice(0, 100) });
         else if (m.t === 'guard') this.onGuard({ ok: m.ok === true, error: typeof m.error === 'string' ? m.error : undefined, price: Number(m.price) || 0, until: Number(m.until) || 0 });
         else if (m.t === 'rank') this.onRank({ ...(m as unknown as RankMsg), jailed: Array.isArray(m.jailed) ? (m.jailed as RankMsg['jailed']) : [] });
@@ -356,6 +359,11 @@ export class Online {
   setAway(away: boolean): void {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'away', away }));
     this.away = away;
+  }
+
+  /** ask the bank for a loan, or pay it (an amount, or 'all') */
+  bank(op: 'loan' | 'repay', amount: number | 'all'): void {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: op, amount }));
   }
 
   scout(n: number): void {

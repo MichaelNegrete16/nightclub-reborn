@@ -34,7 +34,8 @@ export class ContextBar {
     const sel = v.state.items.find((i) => i.uid === v.selectedUid);
     return JSON.stringify([
       t.kind,
-      t.kind === 'place' ? [t.defId, t.mode, !!t.moveFrom] : 0,
+      t.kind === 'place' ? [t.defId, t.mode, !!t.moveFrom] : t.kind === 'area' ? [!!t.a, v.areaFilter] : t.kind === 'group' ? t.uids.length : 0,
+      v.selection.length,
       v.message,
       sel ? [sel.uid, sel.id, tierOfItem(sel), (sel.hot ?? 0) > Date.now()] : 0,
     ]);
@@ -59,6 +60,44 @@ export class ContextBar {
       return b;
     };
 
+    if (v.tool.kind === 'area') {
+      const info = el('div', 'ctx-info');
+      info.append(el('b', '', 'Seleccionar varias piezas'), el('small', v.message ? 'bad' : '', v.message || 'Toca una esquina de la zona'));
+      const row = el('div', 'ctx-actions');
+      const floors = v.areaFilter === 'floors';
+      row.append(
+        act('select', floors ? 'Solo suelos ✓' : 'Solo suelos', () => v.setAreaFilter('floors'), floors ? 'upgrade' : 'ghost'),
+        act('select', floors ? 'Todo' : 'Todo ✓', () => v.setAreaFilter('all'), floors ? 'ghost' : 'upgrade'),
+        act('close', 'Cancelar', () => v.cancelTool(), 'ghost'),
+      );
+      this.root.append(info, row);
+      this.root.classList.add('show', 'placing');
+      return;
+    }
+    if (v.tool.kind === 'group') {
+      const info = el('div', 'ctx-info');
+      info.append(el('b', '', `Moviendo ${v.tool.uids.length} ${v.tool.uids.length === 1 ? 'pieza' : 'piezas'}`), el('small', v.message ? 'bad' : '', v.message || 'Haz clic donde quieras el bloque (en el celular, toca dos veces)'));
+      const row = el('div', 'ctx-actions');
+      row.append(act('close', 'Cancelar', () => v.cancelTool(), 'ghost'));
+      this.root.append(info, row);
+      this.root.classList.add('show', 'placing');
+      return;
+    }
+    if (v.selection.length) {
+      const n = v.selection.length;
+      const info = el('div', 'ctx-info');
+      info.append(el('b', '', `${n} ${n === 1 ? 'pieza seleccionada' : 'piezas seleccionadas'}`), el('small', v.message ? 'bad' : '', v.message || 'Muévelas, guárdalas o véndelas juntas'));
+      const row = el('div', 'ctx-actions');
+      row.append(
+        act('move', 'Mover todo', () => v.startGroupMove(), 'upgrade'),
+        act('stash', 'Guardar todo', () => v.stashSelection()),
+        act('sell', `Vender todo +${fmt(v.selectionValue())}`, () => v.sellSelection(), 'danger'),
+        act('close', 'Quitar selección', () => v.clearSelection(), 'ghost'),
+      );
+      this.root.append(info, row);
+      this.root.classList.add('show');
+      return;
+    }
     if (v.tool.kind === 'place') {
       const def = BY_ID.get(v.tool.defId)!;
       const moving = !!v.tool.moveFrom;

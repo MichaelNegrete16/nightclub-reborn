@@ -103,6 +103,8 @@ export class SaveStore {
     // (the losses and winnings of the robberies come first, so the upload is compared with the stored game on equal terms)
     const checked = validate(prev?.state ?? null, reconcile(state, pending), prev ? now - prev.at : 0, measured);
     state = checked.state;
+    // the bank's books are the server's: an uploaded game can never lower the debt, free a piece or clear bad credit
+    state = { ...state, loan: prev?.state.loan ?? null, embargoed: prev?.state.embargoed ?? [], badCreditUntil: prev?.state.badCreditUntil ?? 0 };
     const meta = metaOf(state);
     if (prev && !force && prev.meta.xp >= WIPE_MIN_XP && meta.xp < prev.meta.xp * WIPE_RATIO) {
       // looks like a wipe: keep it apart and leave the good copy where it is

@@ -75,7 +75,9 @@ export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[]; w
   const free = (x: number, y: number) => x >= 0 && y >= 0 && x < p.w && y < p.h && !blocked.has(`${x},${y}`);
   const out: { dj: Spot[]; bartender: Spot[]; waiter: Spot[] } = { dj: [], bartender: [], waiter: [] };
   const taken = new Set<string>();
-  for (const it of state.items) {
+  // the best booth gets the first DJ: the professional one, then the plain one
+  const rank = (id: string) => (id === 'dj_booth_pro' ? 2 : BOOTH_IDS.includes(id) ? 1 : 0);
+  for (const it of [...state.items].sort((a, b) => rank(b.id) - rank(a.id))) {
     const def = BY_ID.get(it.id);
     const role = BOOTH_IDS.includes(it.id) ? 'dj' : def?.category === 'bars' && def.needsAccess ? 'bartender' : null;
     if (!role || !def) continue;
@@ -99,11 +101,16 @@ export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[]; w
       const hi = back[back.length - 1];
       cand.push([lo[0] - ax, lo[1] - az], [hi[0] + ax, hi[1] + az]);
     }
+    // a booth against a wall has nothing behind it: the DJ may stand at its sides or even in front of it (still facing the guests)
+    if (role === 'dj') {
+      for (const [x, y] of cells) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (!own.has(`${x + dx},${y + dy}`)) cand.push([x + dx, y + dy]);
+    }
     for (const [x, y] of cand) {
       const k = `${x},${y}`;
       if (!free(x, y) || taken.has(k)) continue;
       taken.add(k);
       out[role].push({ x: x + 0.5, z: y + 0.5, fx, fz });
+      if (role === 'dj') break; // one DJ per booth: a second booth needs its own DJ
     }
   }
   // waiters: a free cell right next to each lounge piece, facing it

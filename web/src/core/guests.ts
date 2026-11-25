@@ -12,7 +12,7 @@ import { CELEBS } from './celebs.ts';
 import { WAGE_EVERY, perksOfStaff, wagePerMinute, type StaffPerks } from './staff.ts';
 
 const SHOW_EVERY = 10;
-import { PARCEL, YARD, PHASES, soundSystem, tierOfItem, blockedSet, cellsOf, doorCells, phaseOf, reachableCells, statsOf, type ClubState, type Phase, type Rot } from './club.ts';
+import { PARCEL, YARD, PHASES, soundSystem, tierOfItem, blockedSet, cellsOf, footprint, doorCells, phaseOf, reachableCells, statsOf, type ClubState, type Phase, type Rot } from './club.ts';
 
 export type Mode = 'walk' | 'dance' | 'drink' | 'lounge' | 'idle';
 export type SlotKind = 'dance' | 'bar' | 'lounge';
@@ -131,6 +131,21 @@ export function guestCap(phase: number, level: number): number {
  */
 /** how high the guest is lifted when sitting: the seat's top, minus the standing height of the hips (0.285), plus a little */
 const SIT_DROP: Record<string, number> = { stool: 0.38, chair_red: 0.26, puff: 0.29, sofa_red_2: 0.31, booth: 0.31, sofa_vip: 0.31, lounge_bed: 0.32, sofa_corner: 0.31 };
+/**
+ * Seats shaped like an L have one corner with no cushion (the corner sofa's back corner, the booth's table): nobody can sit there.
+ * Local centre of that cell at rotation 0, in the model's own axes (+x right, +z towards the front).
+ */
+const HOLE: Record<string, [number, number]> = { sofa_corner: [0.5, -0.5], booth: [0.5, 0.5] };
+
+/** The cell of a 2x2 piece that has no seat once it is turned: [column, row], or null for pieces with no hole. */
+export function seatHole(id: string, rot: Rot): [number, number] | null {
+  const h = HOLE[id];
+  if (!h) return null;
+  let [x, z] = h;
+  for (let i = 0; i < rot; i++) [x, z] = [-z, x]; // each quarter turn maps (x, z) to (-z, x), like the model's rotation
+  return [x > 0 ? 1 : 0, z > 0 ? 1 : 0];
+}
+
 /** facing of an object at each rotation (+Z at rotation 0, turned by the rotation) */
 const FRONT: Array<[number, number]> = [[0, 1], [-1, 0], [0, -1], [1, 0]];
 
@@ -389,7 +404,9 @@ export class GuestSim {
       } else if (def.seats) {
         // a real seat: the guest goes onto the piece itself, facing the way it faces, and sits
         const next4 = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const);
-        const seatCells = cells.filter(([x, y]) => next4.some(([dx, dy]) => this.reach.has(key(x + dx, y + dy))));
+        const hole = seatHole(def.id, it.rot as Rot);
+        const holeCell = hole ? cells[hole[1] * footprint(def, it.rot as Rot).w + hole[0]] : null;
+        const seatCells = cells.filter(([x, y]) => !(holeCell && x === holeCell[0] && y === holeCell[1]) && next4.some(([dx, dy]) => this.reach.has(key(x + dx, y + dy))));
         for (const [x, y] of seatCells.slice(0, def.seats)) {
           s.lounge.push({ kind: 'lounge', key: `lounge:${key(x, y)}`, x, y, fx, fy, sit: SIT_DROP[it.id] ?? 0.28 });
         }
