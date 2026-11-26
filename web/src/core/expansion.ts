@@ -1,6 +1,7 @@
 // Expanding the club: the level only OPENS the next building, the player has to pay for the works. Pure logic.
 
-import { PHASES, levelNow, type ClubState, type Phase } from './club.ts';
+import { BY_ID } from './catalog.ts';
+import { PHASES, cellsOf, inRect, levelNow, patioRect, phaseOf, type ClubState, type Phase } from './club.ts';
 import { PRICE_SCALE } from './pricing.ts';
 import { PHASE_LEVELS } from './progression.ts';
 
@@ -26,6 +27,10 @@ export function expansionState(state: ClubState): { ok: boolean; reason?: string
   if (!e) return { ok: false, reason: 'Tu club ya es el más grande.' };
   if (levelNow(state) < e.unlockLevel) return { ok: false, reason: `La ampliación se abre en el nivel ${e.unlockLevel}.` };
   if (state.coins < e.price) return { ok: false, reason: 'No te alcanzan las monedas para la obra.' };
+  // the works take ground beside the club: whatever is on the terrace has to fit what will be left of it
+  const left = patioRect(e.phase, state.exterior);
+  const stuck = state.items.filter((i) => i.x >= phaseOf(state).w && BY_ID.get(i.id) && cellsOf(BY_ID.get(i.id)!, i.x, i.y, i.rot).some(([cx, cy]) => !inRect(left, cx, cy))).length;
+  if (stuck) return { ok: false, reason: `La obra necesita parte del terreno de la terraza: quita ${stuck} ${stuck === 1 ? 'pieza' : 'piezas'} de la terraza antes de ampliar.` };
   return { ok: true };
 }
 

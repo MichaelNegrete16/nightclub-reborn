@@ -120,7 +120,7 @@ export class GameUi {
     stage.append(this.hud.root, this.context.root, controls, bar, this.toasts);
     const tickSky = () => {
       const d = deps.club.env.describe();
-      this.hud.updateSky(d.hour, d.weather, d.night);
+      this.hud.updateSky(d.hour, d.weather, d.night, d.cycle);
     };
     tickSky();
     setInterval(tickSky, 1000);

@@ -3,7 +3,7 @@
 // money sink the late game needs. A DJ without a booth, or a bartender without a bar, has nothing to do and costs nothing.
 
 import { BOOTH_IDS, BY_ID } from './catalog.ts';
-import { blockedSet, cellsOf, phaseOf, type ClubState } from './club.ts';
+import { blockedSet, cellsOf, inRect, patioRect, phaseOf, type ClubState } from './club.ts';
 import { PRICE_SCALE } from './pricing.ts';
 import { levelOf } from './progression.ts';
 
@@ -57,9 +57,13 @@ export interface Spot {
   z: number;
   fx: number;
   fz: number;
+  /** how high the worker stands above the ground (on a stage) */
+  up?: number;
 }
 
 const FRONT: Array<[number, number]> = [[0, 1], [-1, 0], [0, -1], [1, 0]];
+/** the height of the stage platform */
+export const STAGE_H = 0.4;
 
 /**
  * Where the DJ and the bartenders can stand: on a FREE cell behind the booth or the bar and, when that is the wall or
@@ -72,7 +76,8 @@ export const LOUNGE_IDS = ['sofa_vip', 'sofa_corner', 'booth', 'lounge_bed', 'ta
 export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[]; waiter: Spot[] } {
   const p = phaseOf(state);
   const blocked = blockedSet(state.items);
-  const free = (x: number, y: number) => x >= 0 && y >= 0 && x < p.w && y < p.h && !blocked.has(`${x},${y}`);
+  const patio = patioRect(p, state.exterior);
+  const free = (x: number, y: number) => ((x >= 0 && y >= 0 && x < p.w && y < p.h) || inRect(patio, x, y)) && !blocked.has(`${x},${y}`);
   const out: { dj: Spot[]; bartender: Spot[]; waiter: Spot[] } = { dj: [], bartender: [], waiter: [] };
   const taken = new Set<string>();
   // the best booth gets the first DJ: the professional one, then the plain one
@@ -83,6 +88,13 @@ export function staffSpots(state: ClubState): { dj: Spot[]; bartender: Spot[]; w
     if (!role || !def) continue;
     const [fx, fz] = FRONT[it.rot];
     const cells = cellsOf(def, it.x, it.y, it.rot);
+    if (it.id === 'out_stage') {
+      // the stage carries its own decks: the DJ stands ON it, behind them, looking out at the crowd
+      const cx = cells.reduce((a, [x]) => a + x, 0) / cells.length + 0.5;
+      const cz = cells.reduce((a, [, y]) => a + y, 0) / cells.length + 0.5;
+      out.dj.push({ x: cx - fx * 0.5, z: cz - fz * 0.5, fx, fz, up: STAGE_H });
+      continue;
+    }
     const own = new Set(cells.map(([x, y]) => `${x},${y}`));
     const mx = cells.reduce((a, [x]) => a + x, 0) / cells.length;
     const my = cells.reduce((a, [, y]) => a + y, 0) / cells.length;

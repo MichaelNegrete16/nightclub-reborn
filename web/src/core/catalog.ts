@@ -4,7 +4,7 @@
 import { PRICE_SCALE } from './pricing.ts';
 
 export type Layer = 'floor' | 'object';
-export type CategoryId = 'floors' | 'bars' | 'seats' | 'tables' | 'dj' | 'lights' | 'screens' | 'trophies' | 'decor' | 'security' | 'shows';
+export type CategoryId = 'floors' | 'bars' | 'seats' | 'tables' | 'dj' | 'lights' | 'screens' | 'trophies' | 'decor' | 'security' | 'shows' | 'outdoor';
 
 export interface ItemDef {
   id: string;
@@ -25,10 +25,12 @@ export interface ItemDef {
   max?: number;
   /** accent color for the catalog card */
   color: string;
+  /** only goes on the terrace (outside the building) */
+  outdoor?: boolean;
 }
 
 /** every kind of DJ booth: one of them lets the club open, and they all make the sound system */
-export const BOOTH_IDS = ['dj_booth', 'dj_booth_pro'];
+export const BOOTH_IDS = ['dj_booth', 'dj_booth_pro', 'out_stage'];
 
 export const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: 'floors', label: 'Pistas' },
@@ -42,6 +44,7 @@ export const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: 'shows', label: 'Shows' },
   { id: 'decor', label: 'Decoración' },
   { id: 'security', label: 'Seguridad' },
+  { id: 'outdoor', label: 'Terraza' },
 ];
 
 const BASE_CATALOG: ItemDef[] = [
@@ -109,6 +112,17 @@ const BASE_CATALOG: ItemDef[] = [
   { id: 'velvet_rope', name: 'Cuerda de terciopelo', category: 'decor', layer: 'object', w: 2, d: 1, price: 500, luxury: 5, unlockLevel: 9, color: '#d8262f' },
   { id: 'aquarium', name: 'Acuario', category: 'decor', layer: 'object', w: 2, d: 1, price: 4500, luxury: 30, unlockLevel: 18, color: '#18d8ff' },
   { id: 'fountain', name: 'Fuente', category: 'decor', layer: 'object', w: 2, d: 2, price: 6500, luxury: 45, unlockLevel: 30, color: '#18d8ff' },
+
+  // the terrace (open-air disco): only outside, on the ground the terrace upgrade opens
+  { id: 'out_palm', name: 'Palmera', category: 'outdoor', layer: 'object', w: 1, d: 1, price: 800, luxury: 6, unlockLevel: 25, color: '#2f8f4e', outdoor: true },
+  { id: 'out_fence', name: 'Cordón dorado', category: 'outdoor', layer: 'object', w: 2, d: 1, price: 600, luxury: 4, unlockLevel: 25, color: '#f2c40d', outdoor: true },
+  { id: 'out_stage', name: 'Escenario con cabina de DJ', category: 'outdoor', layer: 'object', w: 3, d: 2, price: 9000, luxury: 30, max: 1, unlockLevel: 25, color: '#ff3da6', outdoor: true },
+  { id: 'out_tower', name: 'Torre de parlantes', category: 'outdoor', layer: 'object', w: 1, d: 1, price: 3500, luxury: 12, unlockLevel: 26, color: '#18d8ff', outdoor: true },
+  { id: 'out_tiki', name: 'Barra tropical', category: 'bars', layer: 'object', w: 3, d: 1, price: 5000, luxury: 22, needsAccess: true, unlockLevel: 27, color: '#c8a060', outdoor: true },
+  { id: 'out_truss', name: 'Arco de luces', category: 'outdoor', layer: 'object', w: 3, d: 1, price: 7000, luxury: 25, unlockLevel: 28, color: '#b04cff', outdoor: true },
+  { id: 'out_brazier', name: 'Brasero', category: 'outdoor', layer: 'object', w: 1, d: 1, price: 1200, luxury: 8, unlockLevel: 29, color: '#ff7a1e', outdoor: true },
+  { id: 'out_sofa', name: 'Sofá VIP exterior', category: 'outdoor', layer: 'object', w: 2, d: 1, price: 2500, luxury: 14, seats: 2, unlockLevel: 30, color: '#7a1030', outdoor: true },
+  { id: 'out_screen', name: 'Pantalla de escenario', category: 'outdoor', layer: 'object', w: 2, d: 1, price: 9000, luxury: 30, unlockLevel: 32, color: '#7a3ad6', outdoor: true },
 ];
 
 /** The shop's prices, scaled (see pricing.ts). */

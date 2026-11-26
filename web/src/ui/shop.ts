@@ -1,6 +1,7 @@
 import { TIER_LEVEL, TIER_NAMES, upgradeCost } from '../core/tiers';
 import { earningOf, FULL_HOUSE } from '../core/income';
 import { BY_ID, CATALOG, CATEGORIES, type CategoryId, type ItemDef } from '../core/catalog';
+import { terraceTier } from '../core/exterior';
 import { levelNow, owned, sellValue } from '../core/club';
 import type { ClubView } from '../render/club';
 import type { Thumbs } from '../render/thumbs';
@@ -27,7 +28,8 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
   let signature = '';
 
   let unsub = () => {};
-  const modal = openModal(mode === 'shop' ? 'Tienda' : 'Inventario', `catalog ${mode}`, () => unsub());
+  let spin = 0;
+  const modal = openModal(mode === 'shop' ? 'Tienda' : 'Inventario', `catalog ${mode}`, () => { unsub(); window.clearInterval(spin); });
   const coins = el('div', 'pill coins');
   modal.headExtra.append(coins);
 
@@ -41,7 +43,7 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
   const visible = (): ItemDef[] => {
     const list = mode === 'shop' ? CATALOG : CATALOG.filter((d) => owned(club.state, d.id) > 0);
     return list
-      .filter((d) => category === 'all' || d.category === category)
+      .filter((d) => category === 'all' || d.category === category || (category === 'outdoor' && !!d.outdoor))
       .sort((a, b) => a.unlockLevel - b.unlockLevel || a.price - b.price);
   };
 
@@ -52,8 +54,8 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
     cats.replaceChildren();
     const mk = (id: CategoryId | 'all', label: string) => {
       const count = (mode === 'inventory'
-        ? CATALOG.filter((d) => (id === 'all' || d.category === id) && owned(club.state, d.id) > 0)
-        : CATALOG.filter((d) => id === 'all' || d.category === id)
+        ? CATALOG.filter((d) => (id === 'all' || d.category === id || (id === 'outdoor' && d.outdoor)) && owned(club.state, d.id) > 0)
+        : CATALOG.filter((d) => id === 'all' || d.category === id || (id === 'outdoor' && d.outdoor))
       ).length;
       if (mode === 'inventory' && id !== 'all' && count === 0) return;
       const b = button('', `cat${category === id ? ' on' : ''}`, () => {
@@ -141,6 +143,7 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
 
   function renderDetail(): void {
     detail.replaceChildren();
+    window.clearInterval(spin);
     const def = selected ? BY_ID.get(selected) : undefined;
     if (!def) {
       detail.append(el('p', 'hint', mode === 'shop' ? 'Elige un objeto para ver sus detalles.' : 'Elige un objeto para colocarlo o venderlo.'));
@@ -149,7 +152,9 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
     const img = el('img', 'big') as HTMLImageElement;
     img.src = ctx.thumbs.item(def.id);
     img.alt = def.name;
-    detail.append(img, el('h3', '', def.name));
+    // the big picture turns through the versions this object can be upgraded to
+    const tierLabel = el('div', 'tier-label');
+    detail.append(img, tierLabel, el('h3', '', def.name));
     const tags = el('div', 'tags');
     const tag = (ic: string, text: string) => {
       const t = el('span', 'tag');
@@ -161,6 +166,7 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
     if (def.seats) tag('guests', `${def.seats} asiento${def.seats > 1 ? 's' : ''}`);
     tag('move', `${def.w}×${def.d}`);
     if (def.layer === 'floor') tag('star', 'Suelo');
+    if (def.outdoor) tag('move', 'Solo en la terraza');
     detail.append(tags);
     // what it earns by itself (the same numbers the club is paid with)
     const earn = earningOf(def);
@@ -174,20 +180,30 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
       detail.append(box);
     }
 
-    // the four versions of this object, so the player sees what upgrading buys
+    // the four versions of this object, so the player sees what upgrading buys: pick one or let them turn by themselves
     const ladder = el('div', 'tiers');
     ladder.append(el('small', '', 'Versiones (se mejoran con el objeto ya puesto):'));
-    const rowT = el('div', 'tier-row');
+    const rowT = el('div', 'tier-tabs');
+    const tabs: HTMLButtonElement[] = [];
+    let shown = 0;
+    const show = (i: number) => {
+      shown = i;
+      img.src = ctx.thumbs.item(def.id, i + 1);
+      tabs.forEach((t, k) => t.classList.toggle('on', k === i));
+      tierLabel.replaceChildren(el('b', `t${i + 1}`, TIER_NAMES[i]), el('span', '', i === 0 ? `Precio ${fmt(def.price)}` : `Mejora +${fmt(upgradeCost(def.price, i as 1 | 2 | 3))} · nivel ${TIER_LEVEL[i]}`));
+    };
     TIER_NAMES.forEach((name, i) => {
-      const cell = el('div', 'tier-cell');
-      const im = el('img') as HTMLImageElement;
-      im.src = ctx.thumbs.item(def.id, i + 1);
-      im.alt = name;
-      cell.append(im, el('b', '', name), el('span', '', i === 0 ? fmt(def.price) : `+${fmt(upgradeCost(def.price, i as 1 | 2 | 3))} · nivel ${TIER_LEVEL[i]}`));
-      rowT.append(cell);
+      const t = button(name, 'tier-tab', () => {
+        window.clearInterval(spin); // the player chose: stop turning
+        show(i);
+      });
+      tabs.push(t);
+      rowT.append(t);
     });
     ladder.append(rowT);
     detail.append(ladder);
+    show(0);
+    spin = window.setInterval(() => show((shown + 1) % TIER_NAMES.length), 1800);
 
     const actions = el('div', 'actions');
     const have = owned(club.state, def.id);
@@ -195,7 +211,8 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
       const level = levelNow(club.state);
       const locked = def.unlockLevel > level;
       const poor = club.state.coins < def.price;
-      const why = locked ? `Se desbloquea en el nivel ${def.unlockLevel}` : poor ? `Te faltan ${fmt(def.price - club.state.coins)} monedas` : '';
+      const noTerrace = !!def.outdoor && terraceTier(club.state.exterior) === 0;
+      const why = locked ? `Se desbloquea en el nivel ${def.unlockLevel}` : noTerrace ? 'Primero abre la terraza (Oficina › Fachada › Terraza)' : poor ? `Te faltan ${fmt(def.price - club.state.coins)} monedas` : '';
       const price = el('div', 'bigprice');
       price.innerHTML = `${icon('coin')} ${fmt(def.price)}`;
       detail.append(price);
@@ -208,7 +225,7 @@ export function openCatalog(ctx: Ctx, mode: Mode): void {
         modal.close();
         club.pickTool(def.id, 'buy');
       });
-      buy.disabled = buyPlace.disabled = locked || poor;
+      buy.disabled = buyPlace.disabled = locked || poor || noTerrace;
       buy.dataset.action = 'buy';
       buyPlace.dataset.action = 'buy-place';
       actions.append(buyPlace, buy);

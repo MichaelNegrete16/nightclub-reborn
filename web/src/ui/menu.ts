@@ -72,6 +72,17 @@ export function openMenu(deps: MenuDeps): void {
   );
   game.append(el('p', 'sub', 'Tu partida se guarda sola en este navegador.'));
 
+  if (import.meta.env.DEV) {
+    // only while developing (npm run dev): never in the game players get
+    const dev = sec('Pruebas (solo en desarrollo)');
+    dev.append(
+      button('Nivel 30 y +50 millones', 'btn', () => club.devBoost(30, 50_000_000)),
+      button('Nivel 50 y +50 millones', 'btn', () => club.devBoost(50, 50_000_000)),
+      button('+50 millones', 'btn', () => club.devBoost(1, 50_000_000)),
+    );
+    dev.append(el('p', 'sub', 'Estos botones no existen en el juego de los jugadores.'));
+  }
+
   const accountSec = sec('Cuenta');
   accountSec.append(
     el('p', 'sub', 'Protege tu club con una passkey y juega con tu progreso desde el celular y el computador.'),
@@ -141,11 +152,11 @@ export function openMenu(deps: MenuDeps): void {
     envSec.append(row);
   };
   if (env.cityOffsetMs !== null) {
-    envSec.append(el('p', 'sub', 'Estás en línea: la hora y el clima los decide la ciudad y son iguales para todos los jugadores. Para elegirlos tú, juega sin conexión.'));
+    envSec.append(el('p', 'sub', 'Estás en línea: el día, la noche y el clima los decide la ciudad (30 minutos de día y 30 de noche) y son iguales para todos los jugadores. Para elegirlos tú, juega sin conexión.'));
   } else {
-    chipRow('Hora', [['Real', 'auto'], ['Mañana', 9], ['Tarde', 17.5], ['Noche', 23]], 'time');
-    chipRow('Clima', [['Real', 'auto'], ...(['clear', 'cloudy', 'rain', 'fog'] as Weather[]).map((w) => [WEATHER_LABEL[w], w] as [string, Weather])], 'weather');
-    envSec.append(el('p', 'sub', '"Real" sigue la hora de tu equipo y un clima que cambia cada pocas horas.'));
+    chipRow('Hora', [['Día y noche', 'auto'], ['Mañana', 9], ['Tarde', 17.5], ['Noche', 23]], 'time');
+    chipRow('Clima', [['Automático', 'auto'], ...(['clear', 'cloudy', 'rain', 'fog'] as Weather[]).map((w) => [WEATHER_LABEL[w], w] as [string, Weather])], 'weather');
+    envSec.append(el('p', 'sub', '"Día y noche" alterna 30 minutos de día con 30 de noche. El clima cambia cada pocas horas.'));
   }
 
   const gfx = sec('Gráficos');

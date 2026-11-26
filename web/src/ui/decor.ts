@@ -4,6 +4,10 @@ import { button, el, fmt } from './dom';
 import { icon } from './icons';
 import { openModal } from './modal';
 import { reactive } from './live';
+import { makeTabs } from './tabs';
+import { startPreview } from './preview';
+
+let lastTab = 'wall';
 import type { Ctx } from './shop';
 
 /** "Decoración del local": the walls, floor, mouldings, lighting and pictures of the inside, from bare basement to luxury. */
@@ -13,9 +17,18 @@ export function openDecor(ctx: Ctx): void {
   const modal = openModal('Decoración del local', 'decor', () => unsub());
   const coins = el('div', 'pill coins');
   modal.headExtra.append(coins);
-  const body = el('div', 'decor-groups');
   const count = el('p', 'facade-intro');
-  modal.body.append(count, el('p', 'facade-intro', 'El local empieza pelado, como un sótano. Cada acabado que compras se pone al instante y suma lujo. Puedes volver a uno anterior cuando quieras.'), body);
+  const pages: Record<string, HTMLElement> = {};
+  const rows: Record<string, HTMLElement> = {};
+  for (const g of GROUPS) {
+    const page = el('section', 'tab-page');
+    const row = el('div', 'decor-row');
+    rows[g.id] = row;
+    page.append(el('p', 'facade-intro', g.hint), row);
+    pages[g.id] = page;
+  }
+  const tabs = makeTabs(GROUPS.map((g) => ({ id: g.id, label: g.label })), pages, lastTab, (id) => (lastTab = id));
+  modal.body.append(count, el('p', 'facade-intro', 'El local empieza pelado, como un sótano. Cada acabado que compras se pone al instante y suma lujo. Puedes volver a uno anterior cuando quieras.'), tabs.bar, ...GROUPS.map((g) => pages[g.id]));
 
   const card = (o: DecorOption) => {
     const s = club.state;
@@ -38,20 +51,32 @@ export function openDecor(ctx: Ctx): void {
       b.textContent = `Nivel ${o.unlockLevel}`;
       b.disabled = true;
     } else b.innerHTML = `${icon('coin')} ${fmt(o.price)}`;
-    c.append(b);
+    const side = el('div', 'card-actions');
+    side.append(b);
+    if (!owned) {
+      // see the inside with this finish before paying for it
+      side.append(button('Ver cómo queda', 'preview-btn', () => {
+        modal.close();
+        startPreview(ctx, {
+          title: o.name,
+          price: o.price,
+          blocked: locked ? `Nivel ${o.unlockLevel}` : club.state.coins < o.price ? 'Faltan monedas' : '',
+          sel: { ...s.decor.sel, [o.group]: o.id },
+          buy: () => club.buyDecor(o.id),
+          back: () => openDecor(ctx),
+        });
+      }));
+    }
+    c.append(side);
     return c;
   };
 
   const draw = () => {
-    body.replaceChildren();
     count.textContent = `Acabados: ${club.state.decor.owned.length} de ${DECOR.length} (5 básicos incluidos).`;
     for (const g of GROUPS) {
-      const sec = el('section', 'decor-group');
-      sec.append(el('h3', '', g.label), el('p', 'decor-hint', g.hint));
-      const row = el('div', 'decor-row');
-      for (const o of optionsOf(g.id)) row.append(card(o));
-      sec.append(row);
-      body.append(sec);
+      const opts = optionsOf(g.id);
+      rows[g.id].replaceChildren(...opts.map(card));
+      tabs.badge(g.id, `${opts.filter((o) => club.state.decor.owned.includes(o.id)).length}/${opts.length}`);
     }
   };
   unsub = reactive(

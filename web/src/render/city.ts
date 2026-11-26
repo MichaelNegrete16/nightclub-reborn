@@ -133,7 +133,6 @@ export function buildCity(neighbors: Neighbor[], home: Cell = { i: 0, j: 0 }, ra
   const bulbMat = new THREE.MeshBasicMaterial({ color: 0x9aa0b0 });
   bulbMat.userData.outlineParameters = { visible: false };
   const haloMats: THREE.MeshBasicMaterial[] = [];
-  const r = rng(5);
   const clubs: City['clubs'] = [];
   const calm = new Map<THREE.Material, THREE.Material>();
 
@@ -219,28 +218,13 @@ export function buildCity(neighbors: Neighbor[], home: Cell = { i: 0, j: 0 }, ra
   g.add(instanced(new THREE.BoxGeometry(1, 0.02, 1), line, dashes));
   g.add(instanced(new THREE.BoxGeometry(1, 0.02, 1), line, zebra));
 
-  // ---- trees and lamps along every lot's street edges ---------------------------------------------------------
-  const trunks: THREE.Matrix4[] = [];
-  const crowns: THREE.Matrix4[] = [];
-  const crownCols: THREE.Color[] = [];
+  // ---- lamps along every lot's street edges (the trees are gone: they hid the clubs and cost frames) -------------
   const poles: THREE.Matrix4[] = [];
   const bulbs: THREE.Matrix4[] = [];
   const halos: Array<[number, number]> = [];
   for (const c of cells) {
     if (!detail(c)) continue;
     const o = lotOrigin(c);
-    for (let x = o.x + 4; x < o.x + LOT.w - 2; x += 7) {
-      trunks.push(at(x, 0.7, o.z + LOT.h - 1.2, 1, 1, 1));
-      const s = 0.9 + r() * 0.5;
-      crowns.push(at(x, 2.5, o.z + LOT.h - 1.2, s, s, s));
-      crownCols.push(new THREE.Color().setHSL(0.3 + r() * 0.06, 0.45, 0.3 + r() * 0.12));
-    }
-    for (let z = o.z + 4; z < o.z + LOT.h - 2; z += 7) {
-      trunks.push(at(o.x + LOT.w - 1.2, 0.7, z, 1, 1, 1));
-      const s = 0.9 + r() * 0.5;
-      crowns.push(at(o.x + LOT.w - 1.2, 2.5, z, s, s, s));
-      crownCols.push(new THREE.Color().setHSL(0.3 + r() * 0.06, 0.45, 0.3 + r() * 0.12));
-    }
     for (let x = o.x + 7; x < o.x + LOT.w; x += 13) {
       poles.push(at(x, 2.4, o.z + LOT.h + 0.9));
       bulbs.push(at(x, 4.9, o.z + LOT.h + 0.9));
@@ -252,9 +236,6 @@ export function buildCity(neighbors: Neighbor[], home: Cell = { i: 0, j: 0 }, ra
       if (Math.abs(c.i) <= 1 && Math.abs(c.j) <= 1) halos.push([o.x + LOT.w + 0.9, z]);
     }
   }
-  g.add(instanced(new THREE.CylinderGeometry(0.22, 0.3, 1.4, 6), std(0x5a4030), trunks));
-  const crown = instanced(new THREE.IcosahedronGeometry(1.5, 1), std(0xffffff, 0.9), crowns, crownCols);
-  g.add(crown);
   g.add(instanced(new THREE.CylinderGeometry(0.08, 0.12, 4.8, 6), std(0x2a2d3c), poles));
   g.add(instanced(new THREE.IcosahedronGeometry(0.34, 1), bulbMat, bulbs));
   const haloTex = canvasTexture(64, 64, (c) => {

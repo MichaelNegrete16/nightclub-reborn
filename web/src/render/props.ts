@@ -567,11 +567,510 @@ function barModel(g: THREE.Group, t: number, len: number, tall: boolean): void {
   }
 }
 
+const muralCache = new Map<number, THREE.CanvasTexture>();
+/** The painted front of a "picó" (the giant sound systems of Cartagena): bright zigzags, a sun and stripes. */
+function mural(i: number): THREE.CanvasTexture {
+  const k = i % 4;
+  let t = muralCache.get(k);
+  if (!t) {
+    const pal: Array<[string, string, string]> = [['#e8281c', '#ffd21e', '#18a84a'], ['#18a84a', '#ffd21e', '#e8281c'], ['#1e5ad6', '#ff3da6', '#ffd21e'], ['#ff7a1e', '#18d8ff', '#7a1030']];
+    const [a, b, c] = pal[k];
+    t = canvasTexture(128, 112, (g) => {
+      g.fillStyle = a;
+      g.fillRect(0, 0, 128, 112);
+      g.fillStyle = b;
+      g.beginPath();
+      g.moveTo(0, 90);
+      for (let x = 0; x <= 128; x += 16) g.lineTo(x, x % 32 ? 74 : 98);
+      g.lineTo(128, 112);
+      g.lineTo(0, 112);
+      g.fill();
+      g.fillStyle = c;
+      g.beginPath();
+      g.arc(64, 36, 22, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = b;
+      g.lineWidth = 4;
+      for (let r = 0; r < 8; r++) {
+        const an = (r / 8) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(64 + Math.cos(an) * 26, 36 + Math.sin(an) * 26);
+        g.lineTo(64 + Math.cos(an) * 40, 36 + Math.sin(an) * 40);
+        g.stroke();
+      }
+      g.strokeStyle = '#150d26';
+      g.lineWidth = 6;
+      g.strokeRect(3, 3, 122, 106);
+    });
+    muralCache.set(k, t);
+  }
+  return t;
+}
+
+/** A tick on an empty marker object inside a group: animates the group's parts without making the whole piece "live". */
+function animate(g: THREE.Group, tick: PropTick): void {
+  const marker = new THREE.Object3D();
+  marker.userData.tick = tick;
+  g.add(marker);
+}
+const rainbow = (m: THREE.MeshToonMaterial, hue: number, light = 0.55): void => {
+  m.color.setHSL(((hue % 1) + 1) % 1, 1, light);
+  m.emissive.copy(m.color);
+};
+const mat = (m: THREE.Mesh): THREE.MeshToonMaterial => m.material as THREE.MeshToonMaterial;
+const horn = (r: number, len: number, color: number, x: number, y: number, z: number, yaw = 0): THREE.Mesh => {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(r, len, 14, 1, true), toon(color, { side: THREE.DoubleSide } as O));
+  m.rotation.set(Math.PI / 2, 0, yaw); // the wide mouth looks forward
+  m.rotation.order = 'YXZ';
+  m.position.set(x, y, z);
+  return m;
+};
+
+/**
+ * The terrace pieces (open air). Same conventions as the rest: centred on the footprint, sitting on y = 0, facing +Z. They move with
+ * the music, and each version grows: the speaker tower becomes a painted "picó" taller than the club, the stage gets an LED arch,
+ * flame jets and a crown, and so on.
+ */
+const OUTDOOR: Record<string, Builder> = {
+  out_palm: (g, t) => {
+    const h = pick(t, 1, 1.25, 1.55, 1.9);
+    g.add(box(0.7, 0.28, 0.7, t === 4 ? 0xf2c40d : 0xd8d2c4, 0, 0, 0));
+    const trunk = cyl(0.07 * (1 + (t - 1) * 0.15), 0.12 * (1 + (t - 1) * 0.15), 1.9 * h, 0x8a6440, 0, 0.28, 0, 8);
+    trunk.rotation.z = 0.07;
+    g.add(trunk);
+    const top = 0.28 + 1.9 * h;
+    const greens = [0x2f8f4e, 0x23703c];
+    const fronds: THREE.Mesh[] = [];
+    const n = pick(t, 7, 9, 11, 14);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const frond = new THREE.Mesh(new THREE.BoxGeometry(0.95 + 0.12 * t, 0.04, 0.24 + 0.03 * t), toon(greens[i % 2]));
+      frond.position.set(Math.cos(a) * 0.42, top, Math.sin(a) * 0.42);
+      frond.rotation.set(0, -a, -0.5);
+      g.add(frond);
+      fronds.push(frond);
+    }
+    if (t >= 2) for (let i = 0; i < 3; i++) g.add(ball(0.09, 0x6a4424, Math.cos(i * 2.1) * 0.14, top - 0.12, Math.sin(i * 2.1) * 0.14, { detail: 1 }));
+    // string lights wound round the trunk (version 3) and gold rings with glowing coconuts (version 4)
+    const lights: THREE.Mesh[] = [];
+    if (t >= 3) {
+      for (let i = 0; i < 12; i++) {
+        const a = i * 1.1;
+        const y = 0.5 + (i / 12) * (top - 0.7);
+        const b = ball(0.045, 0xfff0b0, Math.cos(a) * 0.12, y, Math.sin(a) * 0.12, { detail: 1, ...glow(0xfff0b0, 1.3) });
+        g.add(b);
+        lights.push(b);
+      }
+    }
+    if (t === 4) for (let i = 0; i < 4; i++) g.add(torus(0.13, 0.025, GOLD, 0, 0.55 + i * 0.4 * h, 0, glow(GOLD, 0.5)));
+    animate(g, (time, _b, pulse) => {
+      fronds.forEach((f, i) => {
+        f.rotation.z = -0.5 + Math.sin(time * 1.5 + i * 0.9) * 0.09 - pulse * 0.05;
+        f.rotation.x = Math.sin(time * 1.1 + i * 1.7) * 0.05;
+      });
+      trunk.rotation.z = 0.07 + Math.sin(time * 0.8) * 0.02;
+      lights.forEach((l, i) => {
+        mat(l).emissiveIntensity = 0.5 + 1.6 * Math.max(0, Math.sin(time * 3 - i * 0.6));
+        rainbow(mat(l), time * 0.05 + i * 0.08, 0.6);
+      });
+    });
+  },
+  out_fence: (g, t) => {
+    const H = pick(t, 0.85, 0.95, 1.05, 1.2);
+    const post = pick(t, GOLD, GOLD, 0xdfe6f2, GOLD);
+    for (const x of [-0.8, 0.8]) {
+      g.add(cyl(0.045 + 0.01 * t, 0.065 + 0.01 * t, H, post, x, 0.02, 0, 10));
+      g.add(ball(0.085 + 0.015 * t, post, x, H + 0.08, 0, { detail: 2 }));
+      if (t === 4) g.add(box(0.03, 0.3, 0.03, 0xff3da6, x, H + 0.2, 0, glow(0xff3da6, 1.4)));
+    }
+    const cord = box(1.6, 0.05 + 0.01 * t, 0.05 + 0.01 * t, pick(t, 0x9c1d2e, 0x9c1d2e, 0xff3da6, 0x18d8ff), 0, H - 0.07, 0, t >= 3 ? glow(0xff3da6, 1.2) : { outline: false });
+    g.add(cord);
+    if (t >= 3) animate(g, (time) => rainbow(mat(cord), time * 0.15 + (t === 4 ? 0.5 : 0)));
+  },
+  out_stage: (g, t) => {
+    // a platform with the DJ's decks on it; the hired DJ stands on it, behind the table. It grows an LED arch, flame jets and a crown.
+    g.add(box(2.9, 0.4, 1.9, t === 4 ? 0x2a1f10 : 0x1a1626, 0, 0, 0));
+    const edge = box(2.95, 0.05, 1.95, 0xff3da6, 0, 0.4, 0, glow(0xff3da6, 1.0));
+    g.add(edge);
+    const bars = [-1.2, 0, 1.2].map((x) => box(0.5, 0.04, 0.04, 0x18d8ff, x, 0.46, 0.85, glow(0x18d8ff, 1.4)));
+    bars.forEach((b) => g.add(b));
+    g.add(box(1.5, 0.7, 0.5, 0x2a2438, 0, 0.45, 0.4)); // the booth table
+    g.add(box(1.54, 0.06, 0.54, 0x3c3f52, 0, 1.15, 0.4));
+    for (const x of [-0.45, 0.45]) {
+      const platter = cyl(0.2, 0.2, 0.04, 0x18d8ff, x, 1.21, 0.4, 16, glow(0x18d8ff, 0.9));
+      platter.userData.spin = x < 0 ? 3.2 : -3.2; // the records turn
+      g.add(platter);
+      g.add(cyl(0.05, 0.05, 0.02, 0xffffff, x, 1.25, 0.4, 8));
+    }
+    const mixer = box(0.3, 0.05, 0.3, 0xff3da6, 0, 1.21, 0.4, glow(0xff3da6, 1.1)); // the mixer
+    g.add(mixer);
+    const front = box(1.5, 0.05, 0.04, 0xb04cff, 0, 0.7, 0.66, glow(0xb04cff, 1.3)); // lit front
+    g.add(front);
+    // version 2: an LED arch behind the DJ; 3: side speaker stacks and flame jets; 4: a huge LED wall, a gold crown and more flames
+    const archH = pick(t, 0, 2.3, 2.9, 3.6);
+    const leds: THREE.Mesh[] = [];
+    let wall: THREE.Mesh | null = null;
+    if (t >= 2) {
+      for (const x of [-1.38, 1.38]) g.add(box(0.14, archH, 0.14, 0x3c3f52, x, 0.4, -0.82));
+      g.add(box(2.9, 0.16, 0.16, 0x3c3f52, 0, 0.4 + archH, -0.82));
+      for (let i = 0; i < 9; i++) {
+        const l = box(0.22, 0.07, 0.07, 0xff3da6, -1.2 + i * 0.3, 0.4 + archH + 0.1, -0.82, glow(0xff3da6, 1.5));
+        g.add(l);
+        leds.push(l);
+      }
+    }
+    if (t >= 3) {
+      for (const x of [-1.25, 1.25]) {
+        for (let k = 0; k < 3; k++) {
+          g.add(box(0.55, 0.5, 0.5, 0x2a2438, x, 0.4 + k * 0.52, -0.5));
+          g.add(torus(0.15, 0.025, k % 2 ? 0xff3da6 : 0x18d8ff, x, 0.65 + k * 0.52, -0.24, glow(k % 2 ? 0xff3da6 : 0x18d8ff, 1.4), 0));
+        }
+      }
+    }
+    if (t === 4) {
+      const wallMat = new THREE.MeshBasicMaterial({ color: 0xff3da6, transparent: true, opacity: 0.55, depthWrite: false });
+      wallMat.userData.outlineParameters = { visible: false };
+      wall = new THREE.Mesh(new THREE.PlaneGeometry(2.55, archH - 0.2), wallMat);
+      wall.position.set(0, 0.4 + (archH - 0.2) / 2 + 0.1, -0.8);
+      g.add(wall);
+      const gold = toon(GOLD, glow(GOLD, 0.6));
+      for (let k = -2; k <= 2; k++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.15, k % 2 ? 0.45 : 0.7, 4), gold);
+        spike.position.set(k * 0.55, 0.4 + archH + 0.35 + (k % 2 ? 0 : 0.12), -0.82);
+        g.add(spike);
+      }
+    }
+    // flame jets at the front corners (versions 3 and 4)
+    const jets: THREE.Mesh[] = [];
+    if (t >= 3) {
+      const positions: Array<[number, number]> = t === 4 ? [[-1.35, 0.8], [-0.7, 0.8], [0.7, 0.8], [1.35, 0.8]] : [[-1.35, 0.8], [1.35, 0.8]];
+      for (const [x, z] of positions) {
+        g.add(cyl(0.06, 0.08, 0.16, 0x3c3f52, x, 0.4, z, 8));
+        const f = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.7, 8), toon(0xff7a1e, glow(0xff7a1e, 1.7)));
+        f.position.set(x, 0.9, z);
+        g.add(f);
+        jets.push(f);
+      }
+    }
+    animate(g, (time, beat, pulse) => {
+      rainbow(mat(edge), time * 0.1);
+      mat(edge).emissiveIntensity = 0.7 + 1.1 * pulse;
+      bars.forEach((b, i) => {
+        mat(b).emissiveIntensity = 0.6 + 1.6 * Math.max(0, Math.sin(beat * Math.PI * 0.5 - i * 1.1));
+        b.scale.x = 0.7 + 0.5 * Math.max(0, Math.sin(beat * Math.PI * 0.5 - i * 1.1));
+      });
+      rainbow(mat(mixer), time * 0.3 + 0.5);
+      mat(front).emissiveIntensity = 0.8 + 1.2 * pulse;
+      rainbow(mat(front), time * 0.07 + 0.75);
+      leds.forEach((l, i) => {
+        rainbow(mat(l), time * 0.2 + i * 0.1);
+        mat(l).emissiveIntensity = 0.7 + 1.5 * Math.max(0, Math.sin(time * 5 - i * 0.7));
+      });
+      if (wall) (wall.material as THREE.MeshBasicMaterial).color.setHSL((time * 0.12) % 1, 1, 0.5);
+      jets.forEach((f, i) => {
+        const burst = Math.max(pulse, 0.25 + 0.2 * Math.sin(time * 9 + i * 2));
+        f.scale.set(1, 0.4 + 1.5 * burst, 1);
+        f.position.y = 0.48 + 0.35 * f.scale.y;
+        mat(f).emissiveIntensity = 1 + 0.8 * burst;
+      });
+    });
+  },
+  out_tower: (g, t) => {
+    // the "picó": a tower of painted speaker boxes that gets taller and wilder with every version
+    const levels = pick(t, 3, 4, 6, 8);
+    const W = t === 1 ? 0.78 : 0.94;
+    const rings: THREE.Mesh[] = [];
+    for (let k = 0; k < levels; k++) {
+      const y = k * 0.82;
+      g.add(box(W, 0.8, 0.76, k % 2 ? 0x2a2438 : 0x231d34, 0, y, 0));
+      if (t >= 2) g.add(picture(W * 0.94, 0.7, mural(k + t), 0, y + 0.4, 0.385)); // the painted front
+      const ring = torus(0.24, 0.035, k % 2 ? 0xff3da6 : 0x18d8ff, 0, y + 0.4, 0.39, glow(k % 2 ? 0xff3da6 : 0x18d8ff, 1.4), 0);
+      g.add(ring);
+      rings.push(ring);
+      const cone = cyl(0.17, 0.17, 0.05, 0x0f0c18, 0, y + 0.4, 0.385, 16);
+      cone.rotation.x = Math.PI / 2;
+      g.add(pump(cone, 1.4)); // the woofer pumps with every kick
+    }
+    const top = levels * 0.82;
+    // horns: one on top (version 2), plus side horns (3), plus a crown with a beacon (4)
+    if (t >= 2) g.add(horn(0.3, 0.8, 0xdfe6f2, 0, top + 0.15, 0.2));
+    if (t >= 3) {
+      for (const sx of [-1, 1]) for (const k of [1, Math.floor(levels / 2)]) g.add(horn(0.2, 0.55, 0xf2c40d, sx * 0.55, k * 0.82 + 0.4, 0.3, sx * 0.5));
+    }
+    let beacon: THREE.Mesh | null = null;
+    if (t === 4) {
+      const gold = toon(GOLD, glow(GOLD, 0.7));
+      for (let k = -1; k <= 1; k++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.1, k ? 0.4 : 0.65, 4), gold);
+        spike.position.set(k * 0.3, top + 0.2 + (k ? 0 : 0.12), 0);
+        g.add(spike);
+      }
+      beacon = ball(0.12, 0xffffff, 0, top + 0.95, 0, { detail: 1, ...glow(0xffffff, 1.6) });
+      g.add(beacon);
+    }
+    animate(g, (time, _beat, pulse) => {
+      rings.forEach((r, i) => {
+        mat(r).emissiveIntensity = 0.9 + 2 * pulse * (i % 2 ? 1 : 0.7);
+        r.scale.setScalar(1 + 0.08 * pulse);
+      });
+      if (beacon) {
+        rainbow(mat(beacon), time * 0.5);
+        beacon.scale.setScalar(1 + 0.3 * pulse);
+      }
+    });
+  },
+  out_tiki: (g, t) => {
+    g.add(box(2.9, 0.95, 0.6, t === 4 ? 0xb8862a : 0x8a5a32, 0, 0, 0.05));
+    g.add(box(3.0, 0.08, 0.7, t === 4 ? GOLD : 0xc8a060, 0, 0.95, 0.05));
+    for (const x of [-1.4, 1.4]) for (const z of [-0.2, 0.3]) g.add(box(0.08, 2.1 + 0.15 * (t - 1), 0.08, 0x6a4a2a, x, 0, z));
+    // the roof: one layer, then two, then three, and a gold one
+    const roofs = pick(t, 1, 2, 3, 3);
+    for (let i = 0; i < roofs; i++) {
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(2.3 - i * 0.5, 0.85 - i * 0.1, 4), toon(t === 4 && i === roofs - 1 ? GOLD : 0xd8b860));
+      roof.position.set(0, 2.5 + 0.15 * (t - 1) + i * 0.5, 0.05);
+      roof.rotation.y = Math.PI / 4;
+      roof.scale.set(1.15, 1, 0.5);
+      g.add(roof);
+    }
+    const nb = pick(t, 4, 6, 8, 10);
+    const bottles = Array.from({ length: nb }, (_, k) => {
+      const c = [0x35f08a, 0xff7a1e, 0x18d8ff, 0xff3da6][k % 4];
+      const b = box(0.12, 0.3, 0.12, c, -1.3 + (k * 2.6) / Math.max(1, nb - 1), 1.03, 0.1, glow(c, 0.9));
+      g.add(b);
+      return b;
+    });
+    // a string of party bulbs under the roof, chasing along it
+    const bulbs: THREE.Mesh[] = [];
+    const roofY = 2.05 + 0.15 * (t - 1);
+    for (let i = 0; i < 9; i++) {
+      const bulb = ball(0.06, 0xfff0b0, -1.35 + i * 0.3375, roofY - Math.sin((i / 8) * Math.PI) * 0.12, 0.35, { detail: 1, ...glow(0xfff0b0, 1.2) });
+      g.add(bulb);
+      bulbs.push(bulb);
+    }
+    // version 3: a neon sign and lanterns; 4: flaming torches at both ends
+    let sign: THREE.Mesh | null = null;
+    if (t >= 3) {
+      const tex = canvasTexture(256, 64, (c) => {
+        c.fillStyle = '#150d26';
+        c.fillRect(0, 0, 256, 64);
+        c.fillStyle = '#ff3da6';
+        c.shadowColor = '#ff3da6';
+        c.shadowBlur = 14;
+        c.font = '900 44px "Arial Black", sans-serif';
+        c.textAlign = 'center';
+        c.fillText('TIKI BAR', 128, 48);
+      });
+      sign = picture(1.5, 0.38, tex, 0, 1.55, 0.36);
+      g.add(sign);
+    }
+    const torches: THREE.Mesh[] = [];
+    if (t === 4) {
+      for (const x of [-1.62, 1.62]) {
+        g.add(cyl(0.04, 0.05, 1.5, 0x6a4a2a, x, 0, 0.3, 8));
+        const f = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.4, 8), toon(0xff7a1e, glow(0xff7a1e, 1.6)));
+        f.position.set(x, 1.7, 0.3);
+        g.add(f);
+        torches.push(f);
+      }
+    }
+    animate(g, (time, beat) => {
+      bulbs.forEach((b, i) => {
+        const k = Math.max(0, Math.sin(time * 4 - i * 0.8));
+        mat(b).emissiveIntensity = 0.4 + 1.8 * k;
+        rainbow(mat(b), time * 0.05 + i * 0.07, 0.6);
+      });
+      bottles.forEach((b, i) => (mat(b).emissiveIntensity = 0.5 + 1.2 * Math.max(0, Math.sin(beat * Math.PI * 0.5 + i))));
+      torches.forEach((f, i) => f.scale.set(1, 1 + 0.3 * Math.sin(time * 12 + i * 2) + 0.15 * Math.sin(time * 19), 1));
+      void sign;
+    });
+  },
+  out_truss: (g, t) => {
+    // the lighting rig: more lights, a taller frame, sweeping lasers and a mirror ball with each version
+    const H = pick(t, 2.9, 3.3, 3.8, 4.4);
+    for (const x of [-1.4, 1.4]) g.add(box(0.14 + 0.02 * t, H, 0.14 + 0.02 * t, 0x3c3f52, x, 0, 0));
+    g.add(box(3.1, 0.2, 0.2, 0x3c3f52, 0, H - 0.1, 0));
+    if (t >= 3) g.add(box(3.1, 0.18, 0.18, 0x3c3f52, 0, H - 0.8, 0)); // a second bar
+    const n = pick(t, 4, 6, 8, 10);
+    const pivots: THREE.Group[] = [];
+    const cans: THREE.Mesh[] = [];
+    const beams: THREE.Mesh[] = [];
+    for (let k = 0; k < n; k++) {
+      const x = -1.2 + (k * 2.4) / (n - 1);
+      const y = t >= 3 && k % 2 ? H - 0.85 : H - 0.45;
+      const c = [0xff3da6, 0x18d8ff, 0xffd23a, 0x9aff4a][k % 4];
+      const can = cyl(0.1, 0.15, 0.3, c, x, y, 0.12, 8, glow(c, 1.3));
+      g.add(can);
+      cans.push(can);
+      // each light turns on a pivot at its lamp: the beam sweeps over the dance floor
+      const pivot = new THREE.Group();
+      pivot.position.set(x, y + 0.05, 0.2);
+      const beamMat = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.16, depthWrite: false });
+      beamMat.userData.outlineParameters = { visible: false };
+      const len = y + 0.05;
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(0.5, len, 12, 1, true), beamMat);
+      beam.position.y = -len / 2;
+      pivot.add(beam);
+      g.add(pivot);
+      pivots.push(pivot);
+      beams.push(beam);
+    }
+    // lasers (3 and 4): thin lines that fan out and sweep
+    const lasers: THREE.Group[] = [];
+    if (t >= 3) {
+      const count = pick(t, 0, 0, 3, 5);
+      for (let i = 0; i < count; i++) {
+        const pivot = new THREE.Group();
+        pivot.position.set(-1.0 + i * (2 / Math.max(1, count - 1)), H - 0.3, 0.3);
+        const line = box(0.025, 0.025, 3.2, i % 2 ? 0xff2d9a : 0x35f08a, 0, 0, 1.6, glow(i % 2 ? 0xff2d9a : 0x35f08a, 2));
+        pivot.add(line);
+        g.add(pivot);
+        lasers.push(pivot);
+      }
+    }
+    let ballMesh: THREE.Mesh | null = null;
+    if (t === 4) {
+      ballMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), toon(0xdfe6ff, glow(0x9aa8ff, 0.6)));
+      ballMesh.position.set(0, H - 1.5, 0.4);
+      ballMesh.userData.spin = 1.2;
+      g.add(ballMesh);
+      g.add(cyl(0.015, 0.015, 0.7, 0x3c3f52, 0, H - 1.1, 0.4, 4));
+    }
+    animate(g, (time, beat, pulse) => {
+      pivots.forEach((p, i) => {
+        p.rotation.x = 0.35 + Math.sin(time * 1.2 + i * 1.3) * 0.5; // forward and back
+        p.rotation.z = Math.sin(time * 0.9 + i * 2.1) * 0.55; // side to side
+        const hue = (time * 0.08 + Math.floor(beat / 4) * 0.2 + i * 0.25) % 1;
+        const m = beams[i].material as THREE.MeshBasicMaterial;
+        m.color.setHSL(hue, 1, 0.55);
+        m.opacity = 0.12 + 0.3 * pulse;
+        rainbow(mat(cans[i]), hue);
+      });
+      lasers.forEach((l, i) => {
+        l.rotation.y = Math.sin(time * 1.6 + i) * 0.7;
+        l.rotation.x = 0.5 + Math.sin(time * 1.1 + i * 1.7) * 0.25;
+      });
+    });
+  },
+  out_brazier: (g, t) => {
+    const sc = pick(t, 1, 1.35, 1.7, 2.2);
+    g.add(cyl(0.05 * sc, 0.08 * sc, 1.1 * (0.8 + 0.2 * sc), 0x2a2438, 0, 0, 0, 8));
+    const bowlY = 1.1 * (0.8 + 0.2 * sc);
+    g.add(cyl(0.24 * Math.min(sc, 1.9), 0.13 * Math.min(sc, 1.9), 0.18, t === 4 ? GOLD : 0x3a3448, 0, bowlY, 0, 12));
+    const flames: THREE.Mesh[] = [];
+    const cores: THREE.Mesh[] = [];
+    const spots: Array<[number, number]> = t >= 3 ? [[0, 0], [0.12 * sc, 0.06], [-0.12 * sc, -0.06]] : [[0, 0]];
+    spots.forEach(([x, z], i) => {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.17 * sc * (i ? 0.7 : 1), 0.5 * sc, 8), toon(0xff7a1e, glow(0xff7a1e, 1.6)));
+      f.position.set(x, bowlY + 0.25 * sc + 0.1, z);
+      g.add(f);
+      flames.push(f);
+    });
+    const core = new THREE.Mesh(new THREE.ConeGeometry(0.09 * sc, 0.3 * sc, 8), toon(0xffd23a, glow(0xffd23a, 1.8)));
+    core.position.set(0, bowlY + 0.15 * sc + 0.1, 0);
+    g.add(core);
+    cores.push(core);
+    // embers rising from the biggest one
+    const embers: THREE.Mesh[] = [];
+    if (t === 4) {
+      for (let i = 0; i < 8; i++) {
+        const e = ball(0.035, 0xffd23a, 0, bowlY + 0.5, 0, { detail: 0, ...glow(0xffd23a, 1.8) });
+        g.add(e);
+        embers.push(e);
+      }
+    }
+    animate(g, (time, _b, pulse) => {
+      flames.forEach((flame, i) => {
+        const f = 1 + 0.18 * Math.sin(time * 11 + i * 2) + 0.1 * Math.sin(time * 17.3 + i) + 0.15 * pulse;
+        flame.scale.set(1 + 0.1 * Math.sin(time * 13 + i), f, 1 + 0.1 * Math.cos(time * 9 + i));
+        flame.rotation.z = Math.sin(time * 7 + i) * 0.08;
+        mat(flame).emissiveIntensity = 1.3 + 0.5 * Math.sin(time * 19 + i);
+      });
+      cores.forEach((c) => c.scale.set(1, 1 + 0.25 * Math.sin(time * 15 + 1), 1));
+      embers.forEach((e, i) => {
+        const f = (time * 0.6 + i / embers.length) % 1;
+        e.position.set(Math.sin(i * 7 + time) * 0.25 * f, bowlY + 0.5 + f * 2.2, Math.cos(i * 5) * 0.2 * f);
+        mat(e).opacity = 1 - f;
+        e.visible = f < 0.95;
+      });
+    });
+  },
+  out_sofa: (g, t) => {
+    const col = pick(t, 0x7a1030, 0x7a1030, 0x4a1a7a, 0x7a1030);
+    const dark = pick(t, 0x5a0c24, 0x5a0c24, 0x33104f, 0x5a0c24);
+    g.add(box(1.9, 0.42, 0.8, col, 0, 0.06, 0));
+    g.add(box(1.9, 0.55 + 0.1 * (t - 1), 0.2, col, 0, 0.3, -0.3));
+    for (const x of [-0.9, 0.9]) g.add(box(0.15, 0.5, 0.8, dark, x, 0.1, 0));
+    if (t >= 2) for (const x of [-0.45, 0.45]) g.add(box(0.8, 0.12, 0.6, dark, x, 0.46, 0.02)); // cushions
+    if (t >= 2) for (const x of [-0.8, 0.8]) g.add(box(0.08, 0.06, 0.08, GOLD, x, 0, 0.3)); // gold feet
+    const under: THREE.Mesh[] = [];
+    if (t >= 3) {
+      const strip = box(1.85, 0.05, 0.05, 0xff3da6, 0, 0.04, 0.42, glow(0xff3da6, 1.4));
+      g.add(strip);
+      under.push(strip);
+    }
+    if (t === 4) {
+      g.add(box(1.9, 0.06, 0.82, GOLD, 0, 0.42, 0, glow(GOLD, 0.3)));
+      for (const x of [-0.95, 0.95]) g.add(ball(0.09, GOLD, x, 0.82, -0.3, { detail: 1, ...glow(GOLD, 0.8) }));
+    }
+    if (under.length) animate(g, (time) => rainbow(mat(under[0]), time * 0.15));
+  },
+  out_screen: (g, t) => {
+    // a screen that plays a music visualiser, redrawn a few times a second; it gets taller and gets a lit frame
+    const sh = pick(t, 1, 1.4, 1.9, 2.5);
+    const tex = canvasTexture(256, 128, () => {});
+    const cv = tex.image as HTMLCanvasElement;
+    const c2 = cv.getContext('2d')!;
+    let last = -1;
+    const draw = (time: number, pulse: number) => {
+      const grad = c2.createLinearGradient(0, 0, 256, 128);
+      grad.addColorStop(0, `hsl(${(time * 30) % 360},90%,55%)`);
+      grad.addColorStop(0.5, `hsl(${(time * 30 + 90) % 360},80%,35%)`);
+      grad.addColorStop(1, `hsl(${(time * 30 + 200) % 360},90%,50%)`);
+      c2.fillStyle = grad;
+      c2.fillRect(0, 0, 256, 128);
+      c2.fillStyle = 'rgba(255,255,255,.92)';
+      c2.font = '900 34px "Arial Black", sans-serif';
+      c2.textAlign = 'center';
+      c2.fillText(t >= 3 ? 'EL PICÓ' : 'LIVE DJ', 128, 52);
+      const n = t >= 3 ? 24 : 16;
+      for (let k = 0; k < n; k++) {
+        const hgt = 10 + 46 * Math.abs(Math.sin(time * 3 + k * 0.7)) * (0.5 + 0.5 * pulse + 0.3);
+        c2.fillStyle = 'rgba(0,0,0,.35)';
+        c2.fillRect(k * (256 / n) + 2, 124 - hgt, 256 / n - 5, hgt);
+        c2.fillStyle = 'rgba(255,255,255,.75)';
+        c2.fillRect(k * (256 / n) + 2, 124 - hgt, 256 / n - 5, 3);
+      }
+      tex.needsUpdate = true;
+    };
+    draw(0, 0);
+    const frameH = 1.15 * sh;
+    g.add(box(1.9, frameH, 0.14, 0x3c3f52, 0, 0.95, 0));
+    g.add(picture(1.75, 0.98 * sh, tex, 0, 0.95 + frameH / 2, 0.085));
+    for (const x of [-0.75, 0.75]) g.add(box(0.1, 0.95, 0.1, 0x3c3f52, x, 0, 0));
+    const neon: THREE.Mesh[] = [];
+    if (t >= 3) {
+      for (const [w, h, x, y] of [[1.95, 0.05, 0, 0.95 + frameH], [1.95, 0.05, 0, 0.95], [0.05, frameH, -0.95, 0.95], [0.05, frameH, 0.95, 0.95]] as const) {
+        const m = box(w, h, 0.05, 0xff3da6, x, y, 0.1, glow(0xff3da6, 1.5));
+        g.add(m);
+        neon.push(m);
+      }
+    }
+    if (t === 4) for (const x of [-1.05, 1.05]) g.add(box(0.3, 1.2, 0.3, 0x2a2438, x, 0.1, 0.0));
+    animate(g, (time, _b, pulse) => {
+      neon.forEach((m, i) => rainbow(mat(m), time * 0.15 + i * 0.1));
+      if (time - last < 0.1) return;
+      last = time;
+      draw(time, pulse);
+    });
+  },
+};
+
 const BUILDERS: Record<string, Builder> = {
   floor_cyan: (g, t) => floorTile(g, 0x14e0ff, t),
   floor_pink: (g, t) => floorTile(g, 0xff3da6, t),
   floor_violet: (g, t) => floorTile(g, 0xb04cff, t),
   ...TIERED,
+  ...OUTDOOR,
 
   floor_gold: (g, t) => floorTile(g, 0xffc81a, t),
   floor_led: (g, t) => floorTile(g, 0x5ec8ff, t),
@@ -1116,7 +1615,7 @@ export function buildProp(id: string, w: number, d: number, tier = 1): THREE.Gro
     g.add(inner);
   } else if (build) {
     build(g, tier);
-    if (!(id in TIERED) && !id.startsWith('floor_')) grade(g, tier, w, d); // the rest get the shared finish
+    if (!(id in TIERED) && !(id in OUTDOOR) && !id.startsWith('floor_')) grade(g, tier, w, d); // the rest get the shared finish
   } else g.add(box(w * 0.9, 0.6, d * 0.9, 0x888899, 0, 0, 0));
   return g;
 }

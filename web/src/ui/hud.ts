@@ -103,11 +103,12 @@ export class Hud {
   }
 
   /** Hour and weather over the city (follows the player's clock unless chosen in the menu). */
-  updateSky(hour: number, weather: Weather, night: number): void {
+  updateSky(hour: number, weather: Weather, night: number, cycle: { night: boolean; minsLeft: number } | null = null): void {
     const hh = Math.floor(hour) % 24;
     const mm = Math.floor((hour % 1) * 60);
     const ic = weather === 'rain' ? 'rain' : weather === 'cloudy' || weather === 'fog' ? 'cloud' : night > 0.55 ? 'moon' : 'sun';
-    this.sky.innerHTML = `${icon(ic)} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${WEATHER_LABEL[weather]}`;
+    const time = cycle ? `${cycle.night ? 'Noche' : 'Día'} · ${cycle.night ? 'amanece' : 'anochece'} en ${Math.max(1, Math.ceil(cycle.minsLeft))} min` : `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    this.sky.innerHTML = `${icon(ic)} ${time} · ${WEATHER_LABEL[weather]}`;
     this.sky.title = 'Hora y clima de la ciudad';
   }
 

@@ -581,3 +581,117 @@ body.in-prison .bottombar, body.in-prison .view-controls, body.in-prison .contex
 .modal.bank .bank-held { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #d6314a22; margin-top: 8px; }
 .modal.account .acc-qr { display: block; width: 240px; height: 240px; margin: 10px auto 0; border-radius: 12px; background: #fff; padding: 6px; }
 .modal.account .acc-qr[hidden] { display: none; }
+
+/* ---- bigger, airier management windows (office, facade, decoration) with tabs ---- */
+.modal.office, .modal.facade, .modal.decor { width: min(1040px, 96vw); max-height: min(860px, 94dvh); }
+.modal.office .modal-body, .modal.facade .modal-body, .modal.decor .modal-body { padding: 18px 22px 24px; }
+.modal.office .modal-head h2, .modal.facade .modal-head h2, .modal.decor .modal-head h2 { font-size: 24px; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; padding-bottom: 14px; border-bottom: 3px solid var(--ink); position: sticky; top: -18px; z-index: 2; background: var(--night); padding-top: 4px; }
+.tab { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 12px; border: 3px solid var(--ink); background: var(--night-3); color: #fff; font-family: var(--font-display); font-weight: 400; font-size: 15px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+.tab:hover { filter: brightness(1.15); }
+.tab.on { background: var(--gold); color: #3a2600; transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.tab-badge { font-family: inherit; font-size: 12px; padding: 2px 7px; border-radius: 99px; background: #0007; color: #fff; }
+.tab.on .tab-badge { background: #3a260022; color: #3a2600; }
+.tab-badge[hidden] { display: none; }
+.tab-page[hidden] { display: none; }
+.tab-page { display: grid; gap: 22px; align-content: start; }
+.office-section { display: grid; gap: 12px; }
+.office-title { margin: 0; font-size: 18px; }
+.office-hint { margin: -6px 0 2px; font-size: 14px; opacity: .72; }
+.modal.office .upgrades, .modal.facade .upgrades { gap: 14px; }
+.upgrades.two { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
+.modal.office .upgrade, .modal.facade .upgrade { padding: 16px 18px; gap: 16px; }
+.modal.office .upgrade-text, .modal.facade .upgrade-text { gap: 5px; }
+.modal.office .upgrade-text b, .modal.facade .upgrade-text b { font-size: 16px; }
+.modal.office .upgrade-text span, .modal.facade .upgrade-text span { font-size: 14px; line-height: 1.4; }
+.modal.office .upgrade-buy, .modal.facade .upgrade-buy { min-width: 124px; padding: 11px 14px; font-size: 15px; }
+.upgrade.on { box-shadow: inset 6px 0 0 var(--gold); }
+.modal.office .office-summary { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 0; }
+.modal.office .office-summary .stat { padding: 14px 16px; gap: 6px; }
+.modal.office .office-summary small { font-size: 13px; }
+.modal.office .office-summary b { font-size: 24px; }
+.shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.shortcut { display: grid; gap: 6px; text-align: left; padding: 18px; border-radius: 14px; border: 3px solid var(--ink); background: var(--night-3); color: #fff; cursor: pointer; font: inherit; box-shadow: 0 4px 0 var(--ink); }
+.shortcut:hover { filter: brightness(1.15); }
+.shortcut b { font-family: var(--font-display); font-weight: 400; font-size: 17px; color: var(--gold); }
+.shortcut span { font-size: 14px; opacity: .8; line-height: 1.35; }
+.modal.office .review { padding: 12px 14px; }
+.modal.office .guard-row { gap: 10px; }
+.modal.decor .decor-row { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+.modal.decor .decor-card { padding: 14px 16px; gap: 14px; }
+.modal.decor .decor-card .swatch { width: 48px; height: 48px; border-radius: 12px; }
+.modal.decor .decor-text { gap: 4px; font-size: 14px; }
+.modal.decor .decor-text b { font-size: 16px; }
+.modal.decor .decor-text small { font-size: 13px; }
+.modal.facade .facade-intro, .modal.decor .facade-intro { font-size: 15px; margin: 0 0 6px; }
+@media (max-width: 720px) {
+  .modal.office .modal-body, .modal.facade .modal-body, .modal.decor .modal-body { padding: 14px 14px 22px; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; gap: 6px; top: -14px; }
+  .tab { padding: 10px 14px; font-size: 14px; flex: none; }
+  .modal.office .upgrade, .modal.facade .upgrade { flex-wrap: wrap; padding: 14px; }
+  .modal.office .upgrade-buy, .modal.facade .upgrade-buy { flex: 1 1 100%; }
+  .upgrades.two { grid-template-columns: 1fr; }
+}
+
+/* ---- preview before buying ---- */
+.card-actions { display: grid; gap: 8px; flex: none; justify-items: stretch; }
+.preview-btn { padding: 7px 10px; border-radius: 10px; border: 2px solid var(--ink); background: var(--night-2); color: #bff0ff; font-weight: 800; font-size: 13px; cursor: pointer; }
+.preview-btn:hover { filter: brightness(1.25); }
+.preview-bar { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: var(--night); border: 3px solid var(--gold); box-shadow: 0 6px 0 var(--ink), 0 0 28px #ffd23f55; max-width: 94vw; }
+.preview-text { display: grid; gap: 2px; }
+.preview-text small { color: var(--gold); text-transform: uppercase; letter-spacing: .8px; font-size: 11px; }
+.preview-text b { font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+.preview-back { padding: 11px 16px; border-radius: 10px; border: 3px solid var(--ink); background: var(--night-3); color: #fff; font-weight: 800; cursor: pointer; }
+@media (max-width: 720px) { .preview-bar { flex-wrap: wrap; bottom: 84px; } }
+
+/* ---- a roomier shop and inventory (desktop; phones keep their own layout) ---- */
+@media (min-width: 821px) {
+  .modal.catalog { width: min(1280px, 97vw); max-height: min(920px, 95dvh); }
+  .modal.catalog .layout { grid-template-columns: 220px minmax(0, 1fr) 380px; height: min(800px, calc(95dvh - 84px)); }
+  .modal.catalog .cats { padding: 18px 14px; gap: 8px; }
+  .modal.catalog .cat { padding: 13px 16px; font-size: 15px; }
+  .modal.catalog .cat em { font-size: 12px; }
+  .modal.catalog .grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 18px; padding: 22px; }
+  .modal.catalog .card { padding: 14px 10px 14px; gap: 6px; border-radius: 16px; align-content: start; }
+  .modal.catalog .card img { width: 128px; height: 128px; }
+  .modal.catalog .card .name { font-size: 15px; min-height: 2.5em; line-height: 1.25; align-content: center; }
+  .modal.catalog .card .price { font-size: 16px; }
+  .modal.catalog .card .earn { font-size: 12.5px; padding: 1px 8px; }
+  .modal.catalog .card .count { top: 8px; right: 10px; font-size: 13px; padding: 2px 9px; }
+  .modal.catalog .card .count.have { font-size: 11px; }
+  .modal.catalog .card .lock { font-size: 14px; }
+  .modal.catalog .detail { padding: 24px 22px 28px; gap: 16px; }
+  .modal.catalog .detail img.big { max-width: 230px; }
+  .modal.catalog .detail h3 { font-size: 20px; }
+  .modal.catalog .tags { gap: 8px; }
+  .modal.catalog .tag { padding: 6px 12px; font-size: 13px; }
+  .modal.catalog .detail .income { padding: 12px 14px; gap: 4px; }
+  .modal.catalog .detail .income b { font-size: 15px; }
+  .modal.catalog .detail .income span { font-size: 13px; }
+  .modal.catalog .detail .income small { font-size: 12.5px; line-height: 1.4; }
+  .modal.catalog .tiers { display: grid; gap: 8px; }
+  .modal.catalog .tiers small { font-size: 13px; }
+  .modal.catalog .tier-row { gap: 8px; }
+  .modal.catalog .tier-cell { padding: 8px 4px; }
+  .modal.catalog .tier-cell b { font-size: 13px; }
+  .modal.catalog .tier-cell span { font-size: 11px; }
+  .modal.catalog .bigprice { font-size: 28px; }
+  .modal.catalog .detail .actions { gap: 10px; margin-top: 6px; }
+  .modal.catalog .detail .actions .btn { padding: 14px 16px; font-size: 16px; }
+  .modal.catalog .detail .why { font-size: 14px; }
+  .modal.catalog .kept-row { padding: 10px 14px; gap: 14px; }
+  .modal.catalog .kept-row img { width: 72px; height: 72px; }
+  .modal.catalog .kept-title { font-size: 17px; margin: 18px 0 6px; }
+}
+
+/* ---- shop detail: the big picture turns through the versions ---- */
+.tier-label { display: grid; justify-items: center; gap: 2px; margin-top: -4px; }
+.tier-label b { font-family: var(--font-display); font-weight: 400; font-size: 17px; color: #fff; }
+.tier-label b.t2 { color: var(--sky); } .tier-label b.t3 { color: var(--pink); } .tier-label b.t4 { color: var(--gold); }
+.tier-label span { font-size: 13px; font-weight: 700; opacity: .8; }
+.tier-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.tier-tab { padding: 8px 2px; border-radius: 10px; border: 3px solid var(--ink); background: var(--night); color: #fff; font-weight: 800; font-size: 12px; cursor: pointer; }
+.tier-tab.on { background: var(--gold); color: #3a2600; }
+.modal.catalog .detail .tiers { gap: 6px; }
+@media (min-width: 821px) { .modal.catalog .detail img.big { max-width: 260px; } .modal.catalog .tier-tab { font-size: 13px; padding: 10px 2px; } }
+@media (max-width: 820px) { .detail .tier-label { display: none; } }

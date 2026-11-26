@@ -19,6 +19,7 @@ import { BOOTH_IDS, BY_ID } from '../core/catalog';
 import { TIER_NAMES } from '../core/tiers';
 import { launderPrice } from '../core/kits';
 import { reactive } from './live';
+import { makeTabs } from './tabs';
 import type { Ctx } from './shop';
 
 /** The office computer: the club's team and its wages, the night's numbers, and a shortcut to the facade. */
@@ -29,9 +30,7 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
   const coins = el('div', 'pill coins');
   modal.headExtra.append(coins);
   const summary = el('div', 'office-summary');
-  const team = el('div', 'upgrades');
-  const foot = el('div', 'office-foot');
-  foot.append(button('Ranking de la ciudad', 'upgrade-buy', () => { modal.close(); openRanking(ctx); }), button('Decorar el interior', 'upgrade-buy', () => { modal.close(); openDecor(ctx); }), button('Ver la fachada', 'upgrade-buy', () => { modal.close(); openFacade(); }));
+  const team = el('div', 'upgrades two');
   const soon = el('div', 'upgrades');
   const bag = el('div', 'upgrades');
   const reports = el('div', 'upgrades');
@@ -40,7 +39,45 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
   const bankBox = el('div', 'upgrades');
   const grow = el('div', 'upgrades');
   const reform = el('div', 'upgrades');
-  modal.body.append(summary, el('h3', 'office-title', 'Protector antirrobos'), guardBox, el('h3', 'office-title', 'Reseñas de tus invitados'), reviewsBox, el('h3', 'office-title', 'Banco'), bankBox, el('h3', 'office-title', 'Tu equipo'), team, el('h3', 'office-title', 'Botín (piezas robadas)'), bag, el('h3', 'office-title', 'Informes (robos y policía)'), reports, el('h3', 'office-title', 'Ampliación del local'), grow, el('h3', 'office-title', 'Reformas del local'), reform, el('h3', 'office-title', 'Próximos desbloqueos'), soon, foot);
+
+  // shortcuts to the other windows, as big buttons
+  const shortcut = (title: string, text: string, go: () => void) => {
+    const b = el('button', 'shortcut');
+    b.type = 'button';
+    b.append(el('b', '', title), el('span', '', text));
+    b.addEventListener('click', () => { modal.close(); go(); });
+    return b;
+  };
+  const shortcuts = el('div', 'shortcuts');
+  shortcuts.append(
+    shortcut('Fachada', 'Pintura, letrero, entrada y decoración de afuera.', openFacade),
+    shortcut('Decorar el interior', 'Paredes, suelo, luces, molduras y cuadros.', () => openDecor(ctx)),
+    shortcut('Ranking de la ciudad', 'Mira dónde está tu club frente a los demás.', () => openRanking(ctx)),
+    shortcut('Banco', 'Pide un préstamo o paga tu deuda.', () => openBank(ctx)),
+  );
+
+  const section = (title: string, hint: string, ...nodes: HTMLElement[]) => {
+    const sec = el('section', 'office-section');
+    sec.append(el('h3', 'office-title', title));
+    if (hint) sec.append(el('p', 'office-hint', hint));
+    sec.append(...nodes);
+    return sec;
+  };
+  const page = (...nodes: HTMLElement[]) => {
+    const p = el('div', 'tab-page');
+    p.append(...nodes);
+    return p;
+  };
+  const pages: Record<string, HTMLElement> = {
+    summary: page(summary, section('Accesos rápidos', 'Todo lo que puedes mejorar en tu club.', shortcuts), section('Próximos desbloqueos', 'Lo que se abre en los siguientes niveles.', soon)),
+    team: page(section('Tu equipo', 'Cada persona cobra un sueldo por minuto mientras el club está abierto.', team)),
+    works: page(section('Ampliación del local', 'La obra grande de cada etapa: el edificio crece.', grow), section('Reformas del local', 'Cinco reformas que suben el lujo, el cover y el ánimo de la gente.', reform)),
+    money: page(section('Banco', 'Un préstamo para comprar antes y pagarlo por horas.', bankBox)),
+    safety: page(section('Protector antirrobos', '', guardBox), section('Botín (piezas robadas)', 'Lo que has robado y todavía no colocas o limpias.', bag), section('Informes', 'Robos, golpes que diste y visitas de la policía.', reports)),
+    reviews: page(section('Reseñas de tus invitados', 'Lo que dicen al salir y qué hacer con las quejas.', reviewsBox)),
+  };
+  const tabs = makeTabs([{ id: 'summary', label: 'Resumen' }, { id: 'team', label: 'Equipo' }, { id: 'works', label: 'Obras' }, { id: 'money', label: 'Dinero' }, { id: 'safety', label: 'Seguridad' }, { id: 'reviews', label: 'Reseñas' }], pages);
+  modal.body.append(tabs.bar, ...Object.values(pages));
 
   const stat = (label: string, value: string) => {
     const d = el('div', 'stat');
@@ -228,6 +265,11 @@ export function openOffice(ctx: Ctx, openFacade: () => void): void {
       rows.push(row);
     }
     soon.replaceChildren(...(rows.length ? rows : [el('p', 'facade-intro', 'Ya abriste todo lo que hay por ahora.')]));
+    const hotCount = s.loot.filter((l) => l.hotUntil > nowMs).length;
+    tabs.badge('safety', hotCount ? `🔥${hotCount}` : '');
+    tabs.badge('money', s.loan ? 'deuda' : '');
+    tabs.badge('reviews', topComplaints(s.reviews).length ? '!' : '');
+    tabs.badge('team', `${STAFF.reduce((a, d) => a + s.staff[d.role], 0)}`);
   };
   unsub = reactive(
     ctx,

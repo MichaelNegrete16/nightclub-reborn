@@ -104,6 +104,83 @@ function wallTexture(style: string): THREE.CanvasTexture {
         g.lineTo(x + 56, 20);
         g.stroke();
       }
+    } else if (style === 'wall_velvet') {
+      g.fillStyle = '#6a0e2a';
+      g.fillRect(0, 0, W, H);
+      for (let x = 0; x < W; x += 16) {
+        const fold = g.createLinearGradient(x, 0, x + 16, 0);
+        fold.addColorStop(0, 'rgba(0,0,0,.35)');
+        fold.addColorStop(0.5, 'rgba(255,120,150,.18)');
+        fold.addColorStop(1, 'rgba(0,0,0,.35)');
+        g.fillStyle = fold;
+        g.fillRect(x, 0, 16, H);
+      }
+      g.fillStyle = '#e8b82a';
+      g.fillRect(0, 0, W, 5);
+      g.fillRect(0, H - 5, W, 5);
+    } else if (style === 'wall_deco') {
+      g.fillStyle = '#14141c';
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = '#e8b82a';
+      g.lineWidth = 2;
+      for (let x = 0; x < W; x += 64) {
+        for (let k = 1; k <= 5; k++) {
+          g.beginPath();
+          g.arc(x + 32, H, k * 11, Math.PI, 0);
+          g.stroke();
+        }
+        g.beginPath();
+        g.moveTo(x, 0);
+        g.lineTo(x, H);
+        g.stroke();
+      }
+    } else if (style === 'wall_jungle') {
+      g.fillStyle = '#17331f';
+      g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 160; i++) {
+        g.fillStyle = `hsl(${105 + r() * 40},${45 + r() * 25}%,${22 + r() * 24}%)`;
+        g.beginPath();
+        g.ellipse(r() * W, r() * H, 5 + r() * 9, 2.5 + r() * 4, r() * Math.PI, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let i = 0; i < 18; i++) {
+        g.fillStyle = r() < 0.5 ? '#ffd98a' : '#ff8ac8';
+        g.beginPath();
+        g.arc(r() * W, r() * H, 1.6 + r() * 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else if (style === 'wall_galaxy') {
+      const sky = g.createLinearGradient(0, 0, W, H);
+      sky.addColorStop(0, '#0b0630');
+      sky.addColorStop(0.5, '#2a1068');
+      sky.addColorStop(1, '#0a1a4a');
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 3; i++) {
+        const cx = r() * W, cy = r() * H;
+        const neb = g.createRadialGradient(cx, cy, 2, cx, cy, 60);
+        neb.addColorStop(0, `hsla(${280 + r() * 60},90%,60%,.45)`);
+        neb.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = neb;
+        g.fillRect(0, 0, W, H);
+      }
+      for (let i = 0; i < 110; i++) {
+        g.fillStyle = `rgba(255,255,255,${0.4 + r() * 0.6})`;
+        g.fillRect(r() * W, r() * H, 1 + (r() < 0.12 ? 1 : 0), 1 + (r() < 0.12 ? 1 : 0));
+      }
+    } else if (style === 'wall_gold') {
+      g.fillStyle = '#7a5a10';
+      g.fillRect(0, 0, W, H);
+      for (let row = 0; row * 18 < H; row++) {
+        for (let x = -(row % 2) * 24; x < W; x += 48) {
+          const bar = g.createLinearGradient(x, row * 18, x, row * 18 + 16);
+          bar.addColorStop(0, '#fff0a0');
+          bar.addColorStop(0.5, '#e8b82a');
+          bar.addColorStop(1, '#a8780a');
+          g.fillStyle = bar;
+          g.fillRect(x + 2, row * 18 + 2, 44, 15);
+        }
+      }
     } else {
       g.fillStyle = '#0a0f30';
       g.fillRect(0, 0, W, H);
@@ -133,10 +210,10 @@ function wallMaterial(style: string, length: number): THREE.MeshToonMaterial {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(Math.max(1, length / 4), 1);
   const m = new THREE.MeshToonMaterial({ map: tex });
-  if (style === 'wall_neon') {
+  if (style === 'wall_neon' || style === 'wall_galaxy' || style === 'wall_gold') {
     m.emissive = new THREE.Color(0xffffff);
     m.emissiveMap = tex;
-    m.emissiveIntensity = 0.55;
+    m.emissiveIntensity = style === 'wall_neon' ? 0.55 : style === 'wall_galaxy' ? 0.5 : 0.3;
   }
   m.userData.outlineParameters = { thickness: 0.0034, color: [0.02, 0.02, 0.05], alpha: 1, visible: true };
   return m;
@@ -199,6 +276,55 @@ function artTexture(style: string, i: number): THREE.CanvasTexture {
           g.fillRect(14 + r() * 60, 14 + r() * 100, 30 + r() * 60, 20 + r() * 40);
         }
       }
+    } else if (style === 'art_neon') {
+      g.fillStyle = '#0c0c18';
+      g.fillRect(0, 0, 128, 160);
+      const col = ['#ff3da6', '#18e0ff', '#ffd23a', '#9aff4a'][i % 4];
+      g.strokeStyle = col;
+      g.fillStyle = col;
+      g.shadowColor = col;
+      g.shadowBlur = 12;
+      g.lineWidth = 5;
+      g.lineCap = 'round';
+      if (i % 4 === 0) { g.beginPath(); g.arc(64, 70, 34, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.moveTo(52, 62); g.lineTo(52, 76); g.moveTo(76, 62); g.lineTo(76, 76); g.stroke(); g.beginPath(); g.arc(64, 78, 16, 0.2, Math.PI - 0.2); g.stroke(); }
+      else if (i % 4 === 1) { g.beginPath(); g.moveTo(64, 120); g.bezierCurveTo(10, 78, 28, 28, 64, 56); g.bezierCurveTo(100, 28, 118, 78, 64, 120); g.stroke(); }
+      else if (i % 4 === 2) { g.beginPath(); for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2 - Math.PI / 2; const rr = k % 2 ? 16 : 38; g.lineTo(64 + Math.cos(a) * rr, 72 + Math.sin(a) * rr); } g.closePath(); g.stroke(); }
+      else { g.font = '900 34px "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText('DJ', 64, 84); g.strokeRect(22, 40, 84, 60); }
+      g.shadowBlur = 0;
+    } else if (style === 'art_gallery') {
+      const gold = g.createLinearGradient(0, 0, 128, 160);
+      gold.addColorStop(0, '#f4d878');
+      gold.addColorStop(0.5, '#b8861a');
+      gold.addColorStop(1, '#f0d070');
+      g.fillStyle = gold;
+      g.fillRect(0, 0, 128, 160);
+      g.fillStyle = '#1a1424';
+      g.fillRect(12, 12, 104, 136);
+      for (let q = 0; q < 9; q++) {
+        g.fillStyle = `hsla(${(hue + q * 37) % 360},75%,${45 + r() * 20}%,.85)`;
+        g.beginPath();
+        g.arc(24 + r() * 80, 24 + r() * 112, 8 + r() * 26, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else if (style === 'art_stars') {
+      g.fillStyle = '#d8dce8';
+      g.fillRect(0, 0, 128, 160);
+      g.fillStyle = '#1a2a52';
+      g.fillRect(8, 8, 112, 144);
+      const pl = g.createRadialGradient(64, 70, 6, 64, 70, 46);
+      pl.addColorStop(0, '#ffffff');
+      pl.addColorStop(0.6, '#c8d0e4');
+      pl.addColorStop(1, '#8a94b0');
+      g.fillStyle = pl;
+      g.beginPath();
+      g.arc(64, 70, 46, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#14122c';
+      g.beginPath();
+      g.arc(64, 70, 8, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#ffd23a';
+      for (const sx of [34, 64, 94]) { g.beginPath(); g.arc(sx, 138, 5, 0, Math.PI * 2); g.fill(); }
     } else {
       g.fillStyle = '#ffc81a';
       g.fillRect(0, 0, 128, 160);
@@ -231,12 +357,17 @@ const FLOORS: Record<string, { a: number; b: number }> = {
   floor_wood: { a: 0xb07a45, b: 0xa06c3a },
   floor_marble: { a: 0x2a2a35, b: 0x30303c },
   floor_led: { a: 0x18b8e0, b: 0xd02a88 },
+  floor_carpet: { a: 0x9c1d2e, b: 0x8a1828 },
+  floor_terrazzo: { a: 0xd8cfc4, b: 0xcbc1b4 },
+  floor_gold: { a: 0xd9a928, b: 0x16121c },
+  floor_aqua: { a: 0x2ee6c8, b: 0x1a7ae0 },
 };
+const LED_FLOORS = new Set(['floor_led', 'floor_aqua']);
 
 export function buildShell(p: Phase, sel: Decor['sel']): Shell {
   // ---- floor (instanced: cheap even for the biggest building)
   const style = FLOORS[sel.floor] ?? FLOORS.floor_cement;
-  const led = sel.floor === 'floor_led';
+  const led = LED_FLOORS.has(sel.floor);
   const mat = led ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : toon(0xffffff, { outline: false });
   if (led) mat.userData.outlineParameters = { visible: false };
   const floor = new THREE.InstancedMesh(new THREE.BoxGeometry(0.98, 0.04, 0.98), mat, p.w * p.h);
@@ -251,6 +382,7 @@ export function buildShell(p: Phase, sel: Decor['sel']): Shell {
       m4.setPosition(x + 0.5, -0.02, y + 0.5);
       floor.setMatrixAt(i, m4);
       if (sel.floor === 'floor_wood') tmp.copy(ca).lerp(cb, ((y * 7 + x * 3) % 5) / 4).offsetHSL(0, 0, (r() - 0.5) * 0.05);
+      else if (sel.floor === 'floor_terrazzo') tmp.copy(ca).lerp(cb, r()).offsetHSL((r() - 0.5) * 0.08, 0.05, (r() - 0.5) * 0.12);
       else if (sel.floor === 'floor_marble') tmp.copy(ca).lerp(cb, r()).offsetHSL(0, 0, (r() - 0.5) * 0.04);
       else tmp.copy((x + y) % 2 ? ca : cb);
       floor.setColorAt(i, tmp);
@@ -295,6 +427,27 @@ export function buildShell(p: Phase, sel: Decor['sel']): Shell {
         grp.add(strip);
       }
     }
+    if (trim === 'trim_chrome') {
+      const ch = { emissive: 0x8890a8, emissiveIntensity: 0.35 };
+      grp.add(band(along, len, 0.12, 0.24, 0.1, 0xd0d4e0, ch), band(along, len, 2.42, 0.12, 0.1, 0xd0d4e0, ch), band(along, len, 1.25, 0.04, 0.05, 0xd0d4e0, ch));
+    }
+    if (trim === 'trim_crystal') {
+      for (const y of [2.3, 0.2]) grp.add(band(along, len, y, 0.09, 0.05, 0xa8f0ff, { emissive: 0xa8f0ff, emissiveIntensity: 1.3, outline: false }));
+      grp.add(band(along, len, 2.42, 0.06, 0.08, 0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.9, outline: false }));
+    }
+    if (trim === 'trim_fire') {
+      for (const [y, hh] of [[2.3, 0.1], [0.14, 0.18]] as const) grp.add(band(along, len, y, hh, 0.06, 0xff7a1e, { emissive: 0xff5a0a, emissiveIntensity: 1.5, outline: false }));
+      grp.add(band(along, len, 2.42, 0.06, 0.08, 0xffd23a, { emissive: 0xffb02a, emissiveIntensity: 1.1, outline: false }));
+    }
+    if (trim === 'trim_royal') {
+      grp.add(band(along, len, 0.14, 0.28, 0.12, goldC, { emissive: 0x8a5a00, emissiveIntensity: 0.5 }), band(along, len, 2.4, 0.14, 0.12, goldC, { emissive: 0x8a5a00, emissiveIntensity: 0.5 }));
+      grp.add(band(along, len, 2.22, 0.07, 0.05, 0xb04cff, { emissive: 0xb04cff, emissiveIntensity: 1.4, outline: false }));
+      for (let c = 0; c <= len; c += 3) {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.2), toon(goldC, { emissive: 0x8a5a00, emissiveIntensity: 0.5 }));
+        col.position.set(along ? c : 0.03, 1.25, along ? 0.03 : c);
+        grp.add(col);
+      }
+    }
     if (trim === 'trim_gold') {
       grp.add(band(along, len, 0.14, 0.28, 0.12, goldC, { emissive: 0x8a5a00, emissiveIntensity: 0.5 }), band(along, len, 2.4, 0.14, 0.12, goldC, { emissive: 0x8a5a00, emissiveIntensity: 0.5 }));
       for (let c = 0; c <= len; c += 4) {
@@ -308,7 +461,7 @@ export function buildShell(p: Phase, sel: Decor['sel']): Shell {
   // pictures on both walls (the north one carries the most)
   if (sel.art !== 'art_none') {
     const place = (grp: THREE.Group, along: boolean, len: number) => {
-      const step = sel.art === 'art_gold' ? 3.4 : 2.7;
+      const step = sel.art === 'art_gold' ? 3.4 : sel.art === 'art_gallery' ? 3.2 : 2.7;
       for (let k = 0, c = 1.8; c < len - 1.2; c += step, k++) {
         const w = sel.art === 'art_posters' ? 0.8 : 0.78;
         const pic = flat(artTexture(sel.art, k + (along ? 0 : 2)), w, w * 1.25);
@@ -333,6 +486,10 @@ export function buildShell(p: Phase, sel: Decor['sel']): Shell {
     light_spots: { mul: 0.6, a: 0xff8a1e, b: 0x3a7bff, shift: false },
     light_disco: { mul: 1, a: 0x18d8ff, b: 0xff2d9a, shift: false },
     light_laser: { mul: 1.45, a: 0x35f08a, b: 0xff2d9a, shift: true },
+    light_sunset: { mul: 1.1, a: 0xff7a3a, b: 0xff2d7a, shift: false },
+    light_aurora: { mul: 1.3, a: 0x35f0c8, b: 0xb04cff, shift: true },
+    light_royal: { mul: 1.5, a: 0xffc81a, b: 0xd6314a, shift: false },
+    light_ultra: { mul: 1.9, a: 0x18d8ff, b: 0xff2d9a, shift: true },
   };
   return { floor, wallN, wallW, rgb, led: led ? (mat as THREE.MeshBasicMaterial) : null, lights: L[sel.light] ?? L.light_bare };
 }

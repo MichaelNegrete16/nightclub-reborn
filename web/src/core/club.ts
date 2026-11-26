@@ -6,7 +6,7 @@
 
 import { BOOTH_IDS, BY_ID, type ItemDef } from './catalog.ts';
 import { MAX_REVIEWS, type Review, type Tag } from './reviews.ts';
-import { newExterior, sanitizeExterior, type Exterior } from './exterior.ts';
+import { newExterior, sanitizeExterior, terraceTier, type Exterior } from './exterior.ts';
 import { decorLuxury, newDecor, sanitizeDecor, type Decor } from './decor.ts';
 import type { Kit } from './heist.ts';
 import { newMusic, sanitizeMusic, type MusicState } from './music.ts';
@@ -41,7 +41,7 @@ export const PHASES: Phase[] = [
 /** Land the player owns: bigger than the building so there is room to grow. */
 /** Free ground between the edge of the lot and the building on its north and west sides. */
 export const YARD = 4;
-export const PARCEL = { w: 34, h: 38 };
+export const PARCEL = { w: 40, h: 38 };
 
 export type Rot = 0 | 1 | 2 | 3;
 
@@ -225,6 +225,32 @@ export function doorCells(phase: Phase): Array<[number, number]> {
   return [[x, phase.h - 1], [x + 1, phase.h - 1]];
 }
 
+/** The terrace (patio): free ground to the east of the building that the player furnishes with shop objects. Cells use the building's grid. */
+export interface Rect {
+  x0: number;
+  y0: number;
+  /** exclusive */
+  x1: number;
+  y1: number;
+}
+
+/** terrace size by tier: width (east-west) and depth (north-south), in cells */
+export const TERRACE_SIZES: Array<[number, number]> = [[4, 6], [7, 9], [10, 12]];
+
+/** Where the terrace is for a building and the terraces bought (null: none, or the building takes the whole lot). */
+export function patioRect(phase: Phase, ext: Exterior): Rect | null {
+  const tier = terraceTier(ext);
+  if (!tier) return null;
+  const [tw, td] = TERRACE_SIZES[tier - 1];
+  const x0 = phase.w + 1; // one cell of gap from the wall
+  const w = Math.min(tw, PARCEL.w - YARD - 2 - x0); // stays inside the hedge
+  const d = Math.min(td, phase.h - 4);
+  if (w < 2 || d < 2) return null;
+  return { x0, y0: 2, x1: x0 + w, y1: 2 + d };
+}
+
+export const inRect = (r: Rect | null, x: number, y: number): boolean => !!r && x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
+
 const key = (x: number, y: number) => `${x},${y}`;
 
 export function blockedSet(items: PlacedItem[]): Set<string> {
@@ -287,9 +313,13 @@ export function validatePlacement(
 ): Check {
   const phase = phaseOf(state);
   const cells = cellsOf(def, x, y, rot);
-  for (const [cx, cy] of cells) {
-    if (cx < 0 || cy < 0 || cx >= phase.w || cy >= phase.h) return { ok: false, reason: 'Fuera del local' };
-  }
+  const patio = patioRect(phase, state.exterior);
+  const inBuilding = (cx: number, cy: number) => cx >= 0 && cy >= 0 && cx < phase.w && cy < phase.h;
+  // every cell inside the building, or every cell on the terrace (never half and half)
+  const allBuilding = cells.every(([cx, cy]) => inBuilding(cx, cy));
+  const allPatio = cells.every(([cx, cy]) => inRect(patio, cx, cy));
+  if (!allBuilding && !allPatio) return { ok: false, reason: def.outdoor && !patio ? 'Necesitas la terraza (Oficina › Fachada › Terraza)' : patio && cells.some(([cx]) => cx >= phase.w) ? 'Fuera de la terraza' : 'Fuera del local' };
+  if (def.outdoor && !allPatio) return { ok: false, reason: 'Esta pieza va en la terraza, afuera del club' };
 
   const others = state.items.filter((i) => i.uid !== ignoreUid);
   const mine = new Set(cells.map(([cx, cy]) => key(cx, cy)));
@@ -317,6 +347,7 @@ export function validatePlacement(
     const reach = reachableCells(all, phase);
     for (const it of all) {
       const d = BY_ID.get(it.id);
+      if (it.x >= phase.w) continue; // the terrace is open ground: always reachable
       if (d?.needsAccess && !hasAccess(it, d, reach)) return { ok: false, reason: 'Bloquearías el paso' };
     }
   }

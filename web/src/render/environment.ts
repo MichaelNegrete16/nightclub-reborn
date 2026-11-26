@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Sky, sun/moon, light, fog, clouds, stars and rain. The look follows the hour of the day and the weather, and glides
-// from one to the next. "Auto" uses the player's own clock (so at 2 pm it is day) and a weather that changes every few hours.
+// from one to the next. "Auto" alternates 30 real minutes of day and 30 of night, and a weather that changes every few hours.
 
 export type Weather = 'clear' | 'cloudy' | 'rain' | 'fog';
 export interface EnvSetting {
@@ -127,8 +127,20 @@ export function autoWeather(date = new Date()): Weather {
   return r < 0.65 ? 'clear' : r < 0.88 ? 'cloudy' : 'rain'; // no fog: it hid the city
 }
 
-function hourNow(date = new Date()): number {
-  return date.getHours() + date.getMinutes() / 60;
+/** Day and night take turns: 30 real minutes of day, then 30 of night, the same for everyone (it follows the clock, not the player). */
+export const PHASE_MIN = 30;
+const DUSK_MIN = 2;
+
+/** Where the world is in the day-night cycle at a moment (ms): the hour the sky is drawn at, if it is night, and the minutes left. */
+export function cycleAt(ms: number): { hour: number; night: boolean; minsLeft: number } {
+  const m = (ms / 60000) % (PHASE_MIN * 2);
+  const night = m >= PHASE_MIN;
+  const into = night ? m - PHASE_MIN : m;
+  const minsLeft = PHASE_MIN - into;
+  let hour: number;
+  if (!night) hour = into < PHASE_MIN - DUSK_MIN ? 10 + (into / (PHASE_MIN - DUSK_MIN)) * 5 : 15 + ((into - (PHASE_MIN - DUSK_MIN)) / DUSK_MIN) * 6; // sun crosses the sky, then dusk
+  else hour = into < PHASE_MIN - DUSK_MIN ? 21 + (into / (PHASE_MIN - DUSK_MIN)) * 8 : 5 + ((into - (PHASE_MIN - DUSK_MIN)) / DUSK_MIN) * 5; // moon crosses, then dawn
+  return { hour: hour % 24, night, minsLeft };
 }
 
 interface Rig {
@@ -264,17 +276,27 @@ export class Environment {
   }
 
   /** What the sky is doing right now, for the HUD. */
-  describe(): { hour: number; weather: Weather; night: number } {
-    return { hour: this.hour, weather: this.weather, night: this.cur.night };
+  describe(): { hour: number; weather: Weather; night: number; cycle: { night: boolean; minsLeft: number } | null } {
+    return { hour: this.hour, weather: this.weather, night: this.cur.night, cycle: this.auto ? this.cycle : null };
   }
+
+  private auto = true;
+  private cycle: { hour: number; night: boolean; minsLeft: number } = { hour: 12, night: false, minsLeft: 30 };
 
   private refreshTarget(): void {
     if (this.cityOffsetMs !== null) {
       const d = new Date(Date.now() + this.cityOffsetMs);
-      this.hour = ((d.getUTCHours() - 5 + 24) % 24) + d.getUTCMinutes() / 60; // the city keeps Colombia's time
+      const c = cycleAt(d.getTime()); // the city's sky: day and night take turns, the same for everyone
+      this.hour = c.hour;
+      this.cycle = c;
+      this.auto = true;
       this.weather = autoWeather(d);
     } else {
-      this.hour = this.setting.time === 'auto' ? hourNow() : this.setting.time;
+      this.auto = this.setting.time === 'auto';
+      if (this.auto) {
+        this.cycle = cycleAt(Date.now());
+        this.hour = this.cycle.hour;
+      } else this.hour = this.setting.time as number;
       this.weather = this.setting.weather === 'auto' ? autoWeather() : this.setting.weather;
     }
     lookAtHour(this.hour, this.tgt);

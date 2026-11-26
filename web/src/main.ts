@@ -251,7 +251,10 @@ async function main() {
       onScout: (fn) => (heistListeners.scout = fn),
       onHeist: (fn) => (heistListeners.heist = fn),
     };
+    // while developing (npm run dev) nobody is asked for an account: only the deployed game (npm run build) does
+    const devMode = import.meta.env.DEV;
     net.onAuth = () => {
+      if (devMode) return;
       authAsked = true; // this club already has an account: the sign-in window is the one to show
       ui.openAccount(true);
     };
@@ -259,7 +262,7 @@ async function main() {
     // started, and keep asking until it is done
     let authAsked = false;
     const requireAccount = () => {
-      if (authAsked || getToken() || !club.state.story.intro || document.body.classList.contains('in-scene') || document.body.classList.contains('onboarding')) return;
+      if (devMode || authAsked || getToken() || !club.state.story.intro || document.body.classList.contains('in-scene') || document.body.classList.contains('onboarding')) return;
       authAsked = true;
       ui.openAccount(false, true);
     };

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BOOTH_IDS, BY_ID, type ItemDef } from '../core/catalog';
 import {
-  PARCEL, PHASES, YARD, blockedSet, buyItem, doorCells, setOpen as setClubOpen, footprint, levelNow, newClub, owned, phaseOf, placeItem, removeItem, sellFromInventory,
+  PARCEL, PHASES, YARD, blockedSet, patioRect, buyItem, doorCells, setOpen as setClubOpen, footprint, levelNow, newClub, owned, phaseOf, placeItem, removeItem, sellFromInventory,
   groupValue, itemsInRect, moveGroup, sellGroup, sellKept, sellValue, setPhase, stashGroup, stashItem, validatePlacement, type ClubState, type PlaceMode, type PlacedItem, type Rot,
 } from '../core/club';
 import { applyEvents } from '../core/game';
@@ -28,7 +28,7 @@ import { buildInterior } from './interior';
 import type { VisitView } from '../net/client';
 import { buyRenovation, upkeepPerMinute } from '../core/renovation';
 import { buyExpansion } from '../core/expansion';
-import { buyDecor, chooseDecor } from '../core/decor';
+import { buyDecor, chooseDecor, type Decor } from '../core/decor';
 import { applyMail } from '../core/mail';
 import { buyKit } from '../core/kits';
 import type { Kit } from '../core/heist';
@@ -38,7 +38,8 @@ import { settle, stamp } from '../core/offline';
 import { wagePerMinute } from '../core/staff';
 import { buildFacade, buildLane } from './facade';
 import { buildYard } from './yard';
-import { buyUpgrade, choosePaint } from '../core/exterior';
+import { xpToNext } from '../core/progression';
+import { buyUpgrade, choosePaint, terraceTier, type Exterior } from '../core/exterior';
 import { gridPath, routeAround, type Pt } from '../core/walk';
 import { randomConfig, type CharacterConfig } from '../core/character';
 import { fireStaff, hireStaff, staffSpots, type Role } from '../core/staff';
@@ -411,7 +412,7 @@ export class ClubView {
       if (this.earnTimer >= 0.5) this.flushEarnings();
       const outside = this.mode === 'outside';
       const doorY = phaseOf(this.state).h;
-      this.crowd.update(dt, time, [...this.sim.guests, ...this.sim.queue], outside ? (g) => g.y > doorY - 0.4 : undefined);
+      this.crowd.update(dt, time, [...this.sim.guests, ...this.sim.queue], outside ? (g) => g.y > doorY - 0.4 || g.x >= phaseOf(this.state).w : undefined);
       this.watchDoor();
     }
   }
@@ -1418,7 +1419,7 @@ export class ClubView {
     r.add(this.plotLines);
 
     // floor, walls, mouldings, pictures and lights: the finishes the player has bought (render/roomstyle.ts)
-    const shell = buildShell(p, this.state.decor.sel);
+    const shell = buildShell(p, this.previewSel ?? this.state.decor.sel);
     this.shell = shell;
     inner.add(shell.floor);
     this.wallN = shell.wallN;
@@ -1480,6 +1481,11 @@ export class ClubView {
     const pts: number[] = [];
     for (let x = 0; x <= p.w; x++) pts.push(x, 0.03, 0, x, 0.03, p.h);
     for (let y = 0; y <= p.h; y++) pts.push(0, 0.03, y, p.w, 0.03, y);
+    const terrace = patioRect(p, this.previewExt ?? this.state.exterior);
+    if (terrace) {
+      for (let x = terrace.x0; x <= terrace.x1; x++) pts.push(x, 0.06, terrace.y0, x, 0.06, terrace.y1);
+      for (let y = terrace.y0; y <= terrace.y1; y++) pts.push(terrace.x0, 0.06, y, terrace.x1, 0.06, y);
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     this.grid = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x18d8ff, transparent: true, opacity: 0.28 }));
@@ -1763,7 +1769,7 @@ export class ClubView {
     this.staffSig = sig;
     for (const a of this.staffActors) this.staffGroup.remove(a.actor.group);
     this.staffActors = [];
-    const add = (key: string, inside: boolean, x: number, z: number, face: Pt, stance: 'idle' | 'dj_mix') => {
+    const add = (key: string, inside: boolean, x: number, z: number, face: Pt, stance: 'idle' | 'dj_mix', up = 0) => {
       let look = this.staffLooks.get(key);
       if (!look) {
         look = randomConfig(Math.random() < 0.5 ? 'male' : 'female');
@@ -1772,6 +1778,7 @@ export class ClubView {
       const actor = new PlayerActor();
       actor.size = 1.0;
       actor.stance = stance;
+      if (up > 0) actor.floorAt = () => up; // standing on the stage
       void actor.setLook(look).then(() => {
         actor.teleport(x, z);
         actor.face(face[0], face[1]);
@@ -1781,9 +1788,9 @@ export class ClubView {
     };
     // the DJ and the bartenders stand on free cells next to their booth or bar, never inside the furniture
     const spots = staffSpots(s);
-    spots.dj.slice(0, s.staff.dj).forEach((sp, i) => add(`dj:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'dj_mix'));
-    spots.waiter.slice(0, s.staff.waiter).forEach((sp, i) => add(`waiter:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
-    spots.bartender.slice(0, s.staff.bartender).forEach((sp, i) => add(`bartender:${i}`, true, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
+    spots.dj.slice(0, s.staff.dj).forEach((sp, i) => add(`dj:${i}`, sp.x < p.w, sp.x, sp.z, [sp.fx, sp.fz], 'dj_mix', sp.up ?? 0));
+    spots.waiter.slice(0, s.staff.waiter).forEach((sp, i) => add(`waiter:${i}`, sp.x < p.w, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
+    spots.bartender.slice(0, s.staff.bartender).forEach((sp, i) => add(`bartender:${i}`, sp.x < p.w, sp.x, sp.z, [sp.fx, sp.fz], 'idle'));
     const [d1] = doorCells(p);
     for (let i = 0; i < s.staff.guard; i++) {
       // one behind the podium, the other across the carpet, both watching the line
@@ -1813,27 +1820,40 @@ export class ClubView {
     if (!r.error) this.commit(r.state, false);
   }
 
+  /** A look being tried on before buying it (the club's real state is not touched). */
+  private previewExt: Exterior | null = null;
+  private previewSel: Decor['sel'] | null = null;
+
+  /** Try an outside or inside look on the scene without buying it; null stops the preview. */
+  setPreview(p: { ext?: Exterior; sel?: Decor['sel'] } | null): void {
+    this.previewExt = p?.ext ?? null;
+    this.previewSel = p?.sel ?? null;
+    if (this.facadeKey !== this.facadeSig()) this.rebuildFacade();
+    if (this.decorKey !== this.decorSig()) this.rebuildRoom();
+  }
+
   private decorSig(): string {
-    return JSON.stringify(this.state.decor.sel);
+    return JSON.stringify([this.previewSel ?? this.state.decor.sel, terraceTier(this.previewExt ?? this.state.exterior)]);
   }
 
   private facadeSig(): string {
-    return JSON.stringify([this.state.phase, this.state.exterior, this.state.story.name]);
+    return JSON.stringify([this.state.phase, this.previewExt ?? this.state.exterior, this.state.story.name]);
   }
 
   private rebuildFacade(): void {
     disposeChildren(this.facade);
     this.facadeKey = this.facadeSig();
-    this.facade.add(buildFacade(phaseOf(this.state), this.state.exterior, this.state.story.name));
+    this.facade.add(buildFacade(phaseOf(this.state), this.previewExt ?? this.state.exterior, this.state.story.name));
     disposeChildren(this.lane);
-    this.lane.add(buildLane(phaseOf(this.state), this.state.exterior));
+    this.lane.add(buildLane(phaseOf(this.state), this.previewExt ?? this.state.exterior));
   }
 
   /** Show the inside (cutaway, furniture, crowd) or the outside (closed building, street). */
   private applyMode(): void {
     const inside = this.mode === 'inside';
     this.interior.visible = inside;
-    this.items.visible = this.itemsBatch.visible = inside;
+    // the objects stay in the scene outside too: the ones on the terrace are seen from the street (the building's walls and roof hide the rest)
+    this.items.visible = this.itemsBatch.visible = true;
     this.facade.visible = !inside;
     if (!inside) this.highlight.visible = false;
     else this.refreshHighlight();
@@ -1998,6 +2018,15 @@ export class ClubView {
     } else {
       this.walkOutsideTo([pt.x, pt.z], null);
     }
+  }
+
+  /** For trying things while developing (npm run dev): raise the level and add coins. Does nothing in the real game. */
+  devBoost(level: number, coins: number): void {
+    if (!import.meta.env.DEV) return;
+    let xp = 0;
+    for (let l = 1; l < level; l++) xp += xpToNext(l);
+    this.commit({ ...this.state, xp: Math.max(this.state.xp, xp), coins: this.state.coins + coins }, false);
+    this.say(`Pruebas: nivel ${Math.max(level, levelNow(this.state))} y ${coins.toLocaleString('es-CO')} monedas más`);
   }
 
   /** Pay for a facade upgrade (or switch to a paint already owned). */

@@ -1,6 +1,6 @@
 // Guest simulation test (pure logic). Run: node --experimental-strip-types scripts/guests-test.mjs
 import assert from 'node:assert/strict';
-import { newClub, placeItem, setPhase, phaseOf, blockedSet } from '../src/core/club.ts';
+import { newClub, placeItem, setPhase, phaseOf, blockedSet, patioRect } from '../src/core/club.ts';
 import { BY_ID } from '../src/core/catalog.ts';
 import { guestCap, GuestSim, SIDEWALK_Y, COVER, DRINK_PRICE, MAX_QUEUE, VIP_REAL_COVER, VIP_FRAUD_LOSS } from '../src/core/guests.ts';
 
@@ -74,6 +74,41 @@ test('never more guests than the capacity cap, never two on the same slot', () =
     const keys = m.guests.filter((g) => g.slot).map((g) => g.slot.key);
     assert.equal(new Set(keys).size, keys.length, 'two guests share a slot');
   });
+});
+
+test('guests walk out to the terrace to dance, drink and sit there, and leave from it', () => {
+  let s = { ...decorated(), exterior: { owned: ['paint_grey', 'terrace_1'], paint: 'paint_grey' } };
+  const w = phaseOf(s).w;
+  const r = patioRect(phaseOf(s), s.exterior);
+  assert.ok(r);
+  for (let y = r.y0; y < r.y0 + 3; y++) for (let x = r.x0; x < r.x1; x++) s = put(s, 'floor_pink', x, y);
+  s = put(s, 'out_tiki', r.x0, r.y0 + 4);
+  s = put(s, 'out_sofa', r.x0 + 2, r.y0 + 5);
+  const sim = new GuestSim(11);
+  sim.setLayout(s);
+  const blocked = blockedSet(s.items);
+  let onTerrace = 0, danced = 0, served = 0, sat = 0;
+  run(sim, 900, 0.1, (m) => {
+    for (const g of m.guests) {
+      const cx = Math.floor(g.x), cy = Math.floor(g.y);
+      if (g.x >= w && g.y < phaseOf(s).h) {
+        onTerrace++;
+        assert.ok(cx >= w && cx < r.x1 && cy >= 0, `guest ${g.id} wandered off the terrace at ${g.x},${g.y}`);
+        if (g.mode === 'dance') danced++;
+        if (g.mode === 'drink') served++;
+        if (g.mode === 'lounge') sat++;
+        const onSeat = s.items.some((i) => { const d = BY_ID.get(i.id); return d?.seats && cx >= i.x && cx < i.x + (i.rot % 2 ? d.d : d.w) && cy >= i.y && cy < i.y + (i.rot % 2 ? d.w : d.d); });
+        assert.ok(!blocked.has(`${cx},${cy}`) || onSeat, `guest ${g.id} stands inside an object at ${cx},${cy}`);
+      }
+    }
+  });
+  assert.ok(onTerrace > 0 && danced > 0, `guests should dance on the terrace (on it ${onTerrace}, danced ${danced})`);
+  assert.ok(served > 0 && sat > 0, `and drink at the tiki bar and sit on its sofa (drank ${served}, sat ${sat})`);
+  // nobody gets stuck out there: when the doors close everyone leaves, the terrace included
+  sim.enabled = false;
+  run(sim, 400);
+  assert.equal(sim.guests.length, 0);
+  console.log(`      on the terrace ${onTerrace} ticks, danced ${danced}, drank ${served}, sat ${sat}`);
 });
 
 test('everyone leaves once the door stops letting people in', () => {

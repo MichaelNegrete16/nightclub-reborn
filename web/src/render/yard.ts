@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PHASES } from '../core/club';
+import { PARCEL, PHASES, YARD } from '../core/club';
 import { EXPANSION_PRICE } from '../core/expansion';
 import { PHASE_LEVELS } from '../core/progression';
 import { canvasTexture } from './comic';
@@ -21,7 +21,9 @@ const r = new THREE.Group();
     m.position.set(x, y, z);
     r.add(m);
   };
-  flatStd(last.w, last.h, last.w / 2, last.h / 2, -0.055, 0x8c846e); // the reserved ground
+  // the east side of the lot is wider than the biggest building: the terrace goes there
+  const east = PARCEL.w - YARD - 1;
+  flatStd(east, last.h, east / 2, last.h / 2, -0.055, 0x8c846e); // the reserved ground
   if (next) flatStd(next.w, next.h, next.w / 2, next.h / 2, -0.05, 0x9c9378); // the next phase: freshly cleared
 
   // a low clipped hedge around the lot (instead of a fence), with a gap in front of the door
@@ -31,8 +33,8 @@ const r = new THREE.Group();
   const gate1 = gate0 + 7;
   const runs: Array<[number, number, number, number]> = [
     [0, last.h, gate0, last.h],
-    [gate1, last.h, last.w, last.h],
-    [last.w, 0, last.w, last.h],
+    [gate1, last.h, east, last.h],
+    [east, 0, east, last.h],
   ];
   for (const [x1, z1, x2, z2] of runs) {
     const len = Math.hypot(x2 - x1, z2 - z1);

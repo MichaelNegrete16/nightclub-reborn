@@ -12,7 +12,7 @@ import { CELEBS } from './celebs.ts';
 import { WAGE_EVERY, perksOfStaff, wagePerMinute, type StaffPerks } from './staff.ts';
 
 const SHOW_EVERY = 10;
-import { PARCEL, YARD, PHASES, soundSystem, tierOfItem, blockedSet, cellsOf, footprint, doorCells, phaseOf, reachableCells, statsOf, type ClubState, type Phase, type Rot } from './club.ts';
+import { PARCEL, YARD, PHASES, soundSystem, tierOfItem, blockedSet, cellsOf, footprint, doorCells, phaseOf, reachableCells, patioRect, statsOf, type ClubState, type Phase, type Rot } from './club.ts';
 
 export type Mode = 'walk' | 'dance' | 'drink' | 'lounge' | 'idle';
 export type SlotKind = 'dance' | 'bar' | 'lounge';
@@ -178,6 +178,9 @@ export class GuestSim {
   private phase: Phase = PHASES[0];
   private blocked = new Set<string>();
   private reach = new Set<string>();
+  /** the terrace: the strip east of the building (the gap beside the wall and the terrace itself) and what can be walked to in it */
+  private zoneX1 = 0;
+  private zoneReach = new Set<string>();
   private slots: Record<SlotKind, Slot[]> = { dance: [], bar: [], lounge: [] };
   private slotByKey = new Map<string, Slot>();
   private taken = new Set<string>();
@@ -313,6 +316,9 @@ export class GuestSim {
     this.phase = phaseOf(state);
     this.blocked = blockedSet(state.items);
     this.reach = reachableCells(state.items, this.phase);
+    const patio = patioRect(this.phase, state.exterior);
+    this.zoneX1 = patio ? patio.x1 : this.phase.w;
+    this.zoneReach = patio ? this.floodZone() : new Set();
     const st = statsOf(state);
     this.luxury = st.luxury;
     this.capacity = st.capacity;
@@ -345,6 +351,17 @@ export class GuestSim {
       const cx = Math.floor(g.x);
       const cy = Math.floor(g.y);
       const inRoom = cx >= 0 && cy >= 0 && cx < this.phase.w && cy < this.phase.h;
+      if (cx >= this.phase.w && cy < this.phase.h && this.blocked.has(key(cx, cy)) && !(g.slot && g.slot.x === cx && g.slot.y === cy)) {
+        // a piece was dropped on top of a guest on the terrace: back to the gap beside the wall
+        g.x = this.phase.w + 0.5;
+        g.y = this.phase.h - 0.5;
+        g.path = [];
+        this.release(g);
+        g.mode = 'idle';
+        g.timer = 0;
+        g.then = null;
+        continue;
+      }
       if (g.slot && !this.slotByKey.has(g.slot.key)) this.release(g);
       const onOwnSlot = !!g.slot && g.slot.x === cx && g.slot.y === cy;
       if (inRoom && this.blocked.has(key(cx, cy)) && !onOwnSlot) {
@@ -371,6 +388,33 @@ export class GuestSim {
     }
   }
 
+  /** a cell a guest can stand on and be served from: inside the building (reachable from the door) or on the terrace */
+  private canStand(k: string): boolean {
+    return this.reach.has(k) || this.zoneReach.has(k);
+  }
+
+  /** The cells of the terrace strip that can be walked to from the gap beside the building's wall. */
+  private floodZone(): Set<string> {
+    const { w, h } = this.phase;
+    const seen = new Set<string>();
+    const q: Array<[number, number]> = [];
+    for (let y = 0; y < h; y++) {
+      seen.add(key(w, y));
+      q.push([w, y]);
+    }
+    while (q.length) {
+      const [x, y] = q.shift()!;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+        if (nx < w || ny < 0 || nx >= this.zoneX1 || ny >= h) continue;
+        const k = key(nx, ny);
+        if (this.blocked.has(k) || seen.has(k)) continue;
+        seen.add(k);
+        q.push([nx, ny]);
+      }
+    }
+    return seen;
+  }
+
   private computeSlots(state: ClubState): void {
     const s: Record<SlotKind, Slot[]> = { dance: [], bar: [], lounge: [] };
     const barCells = new Set<string>();
@@ -384,7 +428,7 @@ export class GuestSim {
       const cells = cellsOf(def, it.x, it.y, it.rot);
       if (def.layer === 'floor') {
         for (const [x, y] of cells) {
-          if (this.reach.has(key(x, y))) s.dance.push({ kind: 'dance', key: `dance:${key(x, y)}`, x, y, fx: 0, fy: 1 });
+          if (this.canStand(key(x, y))) s.dance.push({ kind: 'dance', key: `dance:${key(x, y)}`, x, y, fx: 0, fy: 1 });
         }
         continue;
       }
@@ -392,21 +436,21 @@ export class GuestSim {
       const own = new Set(cells.map(([x, y]) => key(x, y)));
       const front = cells
         .map(([x, y]) => [x + fx, y + fy] as [number, number])
-        .filter(([x, y]) => !own.has(key(x, y)) && this.reach.has(key(x, y)));
+        .filter(([x, y]) => !own.has(key(x, y)) && this.canStand(key(x, y)));
       if (def.category === 'bars' && def.needsAccess) {
         for (const [x, y] of front) s.bar.push({ kind: 'bar', key: `bar:${key(x, y)}`, x, y, fx: -fx, fy: -fy });
       } else if (def.category === 'bars' && def.seats) {
         // a stool next to the bar: the guest leans on it, facing the bar
         const [sx, sy] = cells[0];
         const toBar = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).find(([dx, dy]) => barCells.has(key(sx + dx, sy + dy)));
-        const reachable = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => this.reach.has(key(sx + dx, sy + dy)));
+        const reachable = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => this.canStand(key(sx + dx, sy + dy)));
         if (toBar && reachable) s.bar.push({ kind: 'bar', key: `bar:${key(sx, sy)}`, x: sx, y: sy, fx: toBar[0], fy: toBar[1], sit: SIT_DROP[it.id] ?? 0.3 });
       } else if (def.seats) {
         // a real seat: the guest goes onto the piece itself, facing the way it faces, and sits
         const next4 = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const);
         const hole = seatHole(def.id, it.rot as Rot);
         const holeCell = hole ? cells[hole[1] * footprint(def, it.rot as Rot).w + hole[0]] : null;
-        const seatCells = cells.filter(([x, y]) => !(holeCell && x === holeCell[0] && y === holeCell[1]) && next4.some(([dx, dy]) => this.reach.has(key(x + dx, y + dy))));
+        const seatCells = cells.filter(([x, y]) => !(holeCell && x === holeCell[0] && y === holeCell[1]) && next4.some(([dx, dy]) => this.canStand(key(x + dx, y + dy))));
         for (const [x, y] of seatCells.slice(0, def.seats)) {
           s.lounge.push({ kind: 'lounge', key: `lounge:${key(x, y)}`, x, y, fx, fy, sit: SIT_DROP[it.id] ?? 0.28 });
         }
@@ -769,6 +813,13 @@ export class GuestSim {
       g.mode = 'walk';
       return;
     }
+    if (g.x >= this.phase.w) {
+      // on the terrace: out along the gap beside the wall, then off along the sidewalk
+      const up = this.bfs([Math.floor(g.x), Math.floor(g.y)], [this.phase.w, this.phase.h - 1], this.inZone) ?? [];
+      g.path = [...up, [this.phase.w, this.phase.h - 1], [this.phase.w, this.phase.h], ...this.sidewalkExit()];
+      g.mode = 'walk';
+      return;
+    }
     const doors = doorCells(this.phase);
     const [dx, dy] = doors[Math.floor(this.rand() * doors.length)];
     const path = this.pathTo(g, dx, dy);
@@ -812,33 +863,70 @@ export class GuestSim {
     g.sit = undefined;
   }
 
-  /** Shortest 4-neighbour walk from the guest's cell to (tx, ty), excluding the start cell. */
-  private pathTo(g: Guest, tx: number, ty: number): Array<[number, number]> | null {
-    const sx = Math.min(Math.max(Math.floor(g.x), 0), this.phase.w - 1);
-    const sy = Math.min(Math.max(Math.floor(g.y), 0), this.phase.h - 1);
-    // a guest still outside the building (south of the door) enters through the door cell first
-    const outside = g.y >= this.phase.h;
-    const start: [number, number] = outside ? [sx, this.phase.h - 1] : [sx, sy];
-    const prefix: Array<[number, number]> = outside ? [start] : [];
-    const goalKey = key(tx, ty);
-    if (start[0] === tx && start[1] === ty) return prefix;
+  private inBuilding = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < this.phase.w && y < this.phase.h;
+  private inZone = (x: number, y: number): boolean => x >= this.phase.w && x < this.zoneX1 && y >= 0 && y < this.phase.h;
+
+  /** Shortest 4-neighbour walk over the cells `ok` allows, excluding the start cell (null: no way). Pieces block, except on the goal. */
+  private bfs(start: [number, number], goal: [number, number], ok: (x: number, y: number) => boolean): Array<[number, number]> | null {
+    if (start[0] === goal[0] && start[1] === goal[1]) return [];
+    const goalKey = key(goal[0], goal[1]);
     const prev = new Map<string, string>();
     const q: Array<[number, number]> = [start];
     prev.set(key(start[0], start[1]), '');
     while (q.length) {
       const [x, y] = q.shift()!;
-      if (x === tx && y === ty) break;
+      if (x === goal[0] && y === goal[1]) break;
       for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
-        if (nx < 0 || ny < 0 || nx >= this.phase.w || ny >= this.phase.h) continue;
+        if (!ok(nx, ny)) continue;
         const k = key(nx, ny);
         if ((this.blocked.has(k) && k !== goalKey) || prev.has(k)) continue;
         prev.set(k, key(x, y));
         q.push([nx, ny]);
       }
     }
-    if (!prev.has(key(tx, ty))) return null;
+    if (!prev.has(goalKey)) return null;
     const out: Array<[number, number]> = [];
-    for (let k = key(tx, ty); k !== key(start[0], start[1]); k = prev.get(k)!) out.push(k.split(',').map(Number) as [number, number]);
-    return [...prefix, ...out.reverse()];
+    for (let k = goalKey; k !== key(start[0], start[1]); k = prev.get(k)!) out.push(k.split(',').map(Number) as [number, number]);
+    return out.reverse();
+  }
+
+  /**
+   * The walk from where the guest stands to (tx, ty), excluding the start cell. Inside the building it is a plain walk over the
+   * cells; to or from the terrace it goes out through the door, along the front of the building and up the gap beside its east wall.
+   */
+  private pathTo(g: Guest, tx: number, ty: number): Array<[number, number]> | null {
+    const { w, h } = this.phase;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+    const gx = Math.floor(g.x);
+    const gy = Math.floor(g.y);
+    const where = gy >= h ? 'street' : gx >= w ? 'zone' : 'building';
+    const [door] = doorCells(this.phase)[0];
+    const doorIn: [number, number] = [door, h - 1];
+    const toZone = (): Array<[number, number]> | null => this.bfs([w, h - 1], [tx, ty], this.inZone);
+    if (tx < w) {
+      if (where === 'building') return this.bfs([clamp(gx, 0, w - 1), clamp(gy, 0, h - 1)], [tx, ty], this.inBuilding);
+      if (where === 'street') {
+        // a guest still outside the building (south of the door) enters through the door cell first
+        const start: [number, number] = [clamp(gx, 0, w - 1), h - 1];
+        const rest = this.bfs(start, [tx, ty], this.inBuilding);
+        return rest ? [start, ...rest] : null;
+      }
+      const up = this.bfs([gx, gy], [w, h - 1], this.inZone);
+      const inside = this.bfs(doorIn, [tx, ty], this.inBuilding);
+      if (!up || !inside) return null;
+      const front: Array<[number, number]> = [];
+      for (let x = w; x >= door; x--) front.push([x, h]);
+      return [...up, ...front, doorIn, ...inside];
+    }
+    // the target is on the terrace
+    if (where === 'zone') return this.bfs([gx, gy], [tx, ty], this.inZone);
+    const rest = toZone();
+    if (!rest) return null;
+    if (where === 'street') return [[w, h], [w, h - 1], ...rest];
+    const toDoor = this.bfs([gx, gy], doorIn, this.inBuilding);
+    if (!toDoor) return null;
+    const front: Array<[number, number]> = [];
+    for (let x = door; x <= w; x++) front.push([x, h]);
+    return [...toDoor, ...front, [w, h - 1], ...rest];
   }
 }

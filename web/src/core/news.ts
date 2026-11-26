@@ -24,6 +24,22 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-27a',
+    date: '27 de noviembre de 2026',
+    title: 'Más mejoras y una oficina más clara',
+    intro: 'Mucho más para comprar en el interior y en la fachada, y una oficina ordenada por pestañas.',
+    entries: [
+      { kind: 'icon', ref: 'monitor', title: 'Oficina con pestañas', text: 'Resumen, Equipo, Obras, Dinero, Seguridad y Reseñas, en una ventana más grande y con más espacio.', where: 'Menú › Oficina' },
+      { kind: 'icon', ref: 'star', title: 'Fachada con 20 mejoras nuevas', text: 'Ocho pinturas, dos letreros (holográfico e imperial), fuente, leones, limusina, terraza en el techo, pantalla LED y más. Cada decoración atrae un poco más de gente.', where: 'Oficina › Fachada · hasta el nivel 48' },
+      { kind: 'icon', ref: 'star', title: 'Una entrada de estrella', text: 'Maceteros, alfombra dorada, braseros, paseo de las estrellas, puertas de cristal, arco de luces y columnas de fuego.', where: 'Oficina › Fachada › Entrada' },
+      { kind: 'icon', ref: 'moon', title: 'Día y noche de verdad', text: 'El cielo alterna 30 minutos de día y 30 de noche, igual para todos los jugadores, con atardecer y amanecer.', where: 'Se ve en el reloj de arriba' },
+      { kind: 'icon', ref: 'star', title: 'Tu disco al aire libre', text: 'Desde el nivel 25 abres una terraza en el terreno libre al lado del club y la armas poco a poco con objetos de la Tienda: pista, escenario con cabina de DJ (sube uno de tus DJ contratados), parlantes, luces, barra tropical y más. Los invitados salen a bailar, tomar y sentarse en tu terraza.', where: 'Oficina › Fachada › Terraza, y Tienda › Terraza' },
+      { kind: 'icon', ref: 'street', title: 'Calles sin árboles', text: 'Quitamos los árboles de las calles: ahora se ven mejor los clubes y el juego va más fluido.', where: 'La ciudad' },
+      { kind: 'icon', ref: 'eye', title: 'Ver cómo queda antes de comprar', text: 'Cada mejora de la fachada y de la decoración tiene un botón para verla puesta en tu club sin pagar.', where: 'Fachada y Decoración › Ver cómo queda' },
+      { kind: 'icon', ref: 'star', title: 'Interior de lujo', text: 'Paredes de terciopelo, art déco, galaxia y oro; suelos de alfombra, oro y piscina de luz; molduras, luces y cuadros nuevos.', where: 'Oficina › Decorar el interior · hasta el nivel 55' },
+    ],
+  },
+  {
     id: '2026-11-26a',
     date: '26 de noviembre de 2026',
     title: 'Tu club en cualquier dispositivo con un QR',

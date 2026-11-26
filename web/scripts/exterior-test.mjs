@@ -1,7 +1,11 @@
 // Facade upgrades and walking (pure logic). Run: node --experimental-strip-types scripts/exterior-test.mjs
 import assert from 'node:assert/strict';
-import { newClub, sanitizeClub } from '../src/core/club.ts';
-import { UPGRADES, UPGRADE_BY_ID, buyUpgrade, choosePaint, perksOf, paintColor, DEFAULT_PAINT } from '../src/core/exterior.ts';
+import { newClub, sanitizeClub, patioRect, validatePlacement, phaseOf, PHASES, PARCEL, YARD } from '../src/core/club.ts';
+import { BY_ID } from '../src/core/catalog.ts';
+import { expansionState } from '../src/core/expansion.ts';
+import { STAGE_H } from '../src/core/staff.ts';
+import { setOpen } from '../src/core/club.ts';
+import { UPGRADES, UPGRADE_BY_ID, terraceTier, buyUpgrade, choosePaint, perksOf, paintColor, DEFAULT_PAINT } from '../src/core/exterior.ts';
 import { gridPath, crosses, routeAround } from '../src/core/walk.ts';
 import { GuestSim } from '../src/core/guests.ts';
 import { hireStaff, fireStaff, wagePerMinute, perksOfStaff, working, staffSpots, STAFF } from '../src/core/staff.ts';
@@ -9,7 +13,7 @@ import { placeItem } from '../src/core/club.ts';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
-const rich = (level = 1) => ({ ...newClub(), coins: 99999, xp: level > 1 ? 10 ** 7 : 0 });
+const rich = (level = 1) => ({ ...newClub(), coins: 1e12, xp: level > 1 ? 10 ** 7 : 0 });
 
 test('a new club starts with the grey paint and no perks', () => {
   const s = newClub();
@@ -35,7 +39,9 @@ test('perks add up: signs do not stack, the rope helps patience', () => {
   let s = rich(2);
   for (const u of UPGRADES) { const r = buyUpgrade(s, u.id); if (!r.error) s = r.state; }
   const p = perksOf(s.exterior);
-  assert.ok(Math.abs(p.arrivals - 1.2 * 1.05) < 1e-9, 'giant sign (20%) and lights (5%), not the neon sign on top');
+  const dressing = Math.min(0.12, UPGRADES.filter((u) => u.group === 'decor' || u.group === 'entrance').length * 0.01);
+  assert.ok(Math.abs(p.arrivals - 1.4 * 1.05 * 1.05 * (1 + dressing)) < 1e-9, 'the biggest sign (40%), the lights (5% each) the decoration and entrance (1% each, up to 12%); the smaller signs do not stack');
+  assert.ok(UPGRADES.length >= 30 && UPGRADES.every((u) => u.price > 0 || u.id === 'paint_grey'), 'many upgrades, all with a price');
   assert.equal(p.patience, 1.3);
 });
 
@@ -169,6 +175,54 @@ test('workers stand on free cells, never in the furniture or the wall; no free c
   boxed = { ...boxed, items: [...boxed.items, ...[[2, 0], [0, 1], [1, 1]].map(([x, y], i) => ({ uid: `p${i}`, id: 'plant', x, y, rot: 0 }))] };
   assert.equal(working(boxed).dj, 0);
   assert.equal(wagePerMinute({ ...boxed, staff: { guard: 0, dj: 1, bartender: 0 } }), 0);
+});
+
+test('the terrace always stays inside the lot and its hedge, in every building, and grows with each step', () => {
+  for (const ph of PHASES) {
+    let last = 0;
+    for (const t of [1, 2, 3]) {
+      const ext = { owned: ['paint_grey', `terrace_${t}`], paint: 'paint_grey' };
+      const r = patioRect(ph, ext);
+      assert.ok(r, `phase ${ph.id} tier ${t} has room`);
+      assert.ok(r.x0 > ph.w && r.x1 <= PARCEL.w - YARD - 2, `phase ${ph.id} tier ${t}: the terrace (${r.x0}-${r.x1}) stays inside the hedge`);
+      assert.ok(r.y0 >= 0 && r.y1 <= ph.h, 'and within the length of the building');
+      assert.ok(r.x1 - r.x0 >= last, 'each step is as big or bigger');
+      last = r.x1 - r.x0;
+    }
+  }
+});
+
+test('the terrace: opened in steps from level 25, only terrace pieces go outside, and the works cannot swallow what is on it', () => {
+  const lvl = (n) => ({ ...newClub(), phase: 6, coins: 1e12, xp: n });
+  assert.match(buyUpgrade(lvl(0), 'terrace_1').error, /nivel 25/);
+  let s = lvl(10 ** 7);
+  assert.match(buyUpgrade(s, 'terrace_2').error, /anterior/, 'in order');
+  const def = BY_ID.get('out_stage');
+  assert.equal(validatePlacement(s, def, 22, 4, 0).ok, false, 'no terrace yet');
+  s = buyUpgrade(s, 'terrace_1').state;
+  assert.equal(terraceTier(s.exterior), 1);
+  const r = patioRect(phaseOf(s), s.exterior);
+  assert.ok(r && r.x0 === phaseOf(s).w + 1 && r.x1 - r.x0 === 4 && r.y1 - r.y0 === 6);
+  assert.equal(validatePlacement(s, def, r.x0, r.y0, 0).ok, true, 'the stage fits on the terrace');
+  assert.equal(validatePlacement(s, def, r.x1 - 2, r.y0, 0).ok, false, 'not past the edge');
+  assert.equal(validatePlacement(s, def, 2, 2, 0).ok, false, 'a terrace piece does not go inside the club');
+  assert.equal(validatePlacement(s, BY_ID.get('floor_cyan'), r.x0, r.y0, 0).ok, true, 'an ordinary floor tile may go on the terrace');
+  assert.equal(validatePlacement(s, BY_ID.get('plant'), r.x0 + 1, r.y0 + 1, 0).ok, true, 'and so may a plant');
+  const placed = { ...s, items: [{ uid: 'i1', id: 'out_stage', x: r.x0, y: r.y0, rot: 0 }] };
+  assert.equal(sanitizeClub(placed).items.length, 1, 'a saved terrace piece survives cleaning');
+  // the stage carries the decks: it lets the club open, and a hired DJ stands ON it
+  assert.equal(setOpen({ ...placed, phase: 6 }, true).error, undefined, 'the stage counts as a DJ booth');
+  const dj = staffSpots(placed).dj;
+  assert.equal(dj.length, 1, 'the stage has a place for a DJ');
+  assert.equal(dj[0].up, STAGE_H, 'on top of the platform');
+  assert.ok(dj[0].x > r.x0 && dj[0].x < r.x0 + 3 && dj[0].z >= r.y0 && dj[0].z < r.y0 + 2, 'inside the stage footprint');
+  assert.equal(hireStaff({ ...placed, xp: 10 ** 7, coins: 1e9 }, 'dj').error, undefined, 'a DJ can be hired for it');
+  assert.equal(sanitizeClub({ ...placed, exterior: { owned: ['paint_grey'], paint: 'paint_grey' } }).items.length, 0, 'without the terrace it does not');
+  const next = { ...placed, phase: 6, xp: 10 ** 8 };
+  const blocked = expansionState(next);
+  assert.equal(blocked.ok, false, 'the biggest building takes the whole lot');
+  assert.match(blocked.reason, /terraza/);
+  assert.equal(expansionState({ ...next, items: [] }).ok, true, 'with the terrace empty the works can go ahead');
 });
 
 console.log(`\n${passed} tests passed`);
