@@ -1,12 +1,11 @@
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { guestId, httpBase } from './client';
+import { restoreGame } from './restore';
 
 // The player's account on the city server: a session token (kept in this browser) and the calls that create, link and
 // recover it. A club with no account keeps working as a guest. See server/auth.mjs.
 
 const TOKEN_KEY = 'nc.token.v1';
-const GUEST_KEY = 'nc.guest.v1';
-const CLUB_KEY = 'nc.club.v1';
 
 export const getToken = (): string => {
   try {
@@ -68,8 +67,12 @@ const deviceLabel = (): string => {
 export const myAccount = () => api<AccountInfo>('me');
 
 /** Protect this club (or add this device to the account) with a passkey. A new account gets its recovery code. */
-export async function createPasskey(): Promise<Result<AccountInfo & { recovery?: string }>> {
-  const o = await api<{ options: Parameters<typeof startRegistration>[0]['optionsJSON']; cid: string }>('register/options', { pid: guestId() });
+/** On a phone the passkey lives in the phone itself; on a computer, by default, on the player's phone (the browser shows a QR). */
+export type PasskeyPlace = 'phone' | 'here';
+export const onPhone = (): boolean => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+export async function createPasskey(via: PasskeyPlace = onPhone() ? 'here' : 'phone'): Promise<Result<AccountInfo & { recovery?: string }>> {
+  const o = await api<{ options: Parameters<typeof startRegistration>[0]['optionsJSON']; cid: string }>('register/options', { pid: guestId(), via });
   if (!o.ok) return o;
   let response;
   try {
@@ -77,14 +80,14 @@ export async function createPasskey(): Promise<Result<AccountInfo & { recovery?:
   } catch (e) {
     return { ok: false, error: friendly(e) };
   }
-  const v = await api<AccountInfo & { token: string; recovery?: string }>('register/verify', { cid: o.cid, response, label: deviceLabel() });
+  const v = await api<AccountInfo & { token: string; recovery?: string }>('register/verify', { cid: o.cid, response, label: via === 'phone' ? 'Mi celular' : deviceLabel() });
   if (v.ok) setToken(v.token);
   return v;
 }
 
 /** Sign in with a passkey this device (or the user's Google/Apple account) has: no id needed. */
-export async function signInWithPasskey(): Promise<Result<AccountInfo & { token: string }>> {
-  const o = await api<{ options: Parameters<typeof startAuthentication>[0]['optionsJSON']; cid: string }>('login/options');
+export async function signInWithPasskey(via: PasskeyPlace = onPhone() ? 'here' : 'phone'): Promise<Result<AccountInfo & { token: string }>> {
+  const o = await api<{ options: Parameters<typeof startAuthentication>[0]['optionsJSON']; cid: string }>('login/options', { via });
   if (!o.ok) return o;
   let response;
   try {
@@ -94,6 +97,16 @@ export async function signInWithPasskey(): Promise<Result<AccountInfo & { token:
   }
   return api<AccountInfo & { token: string }>('login/verify', { cid: o.cid, response });
 }
+
+/** Protect this club without a passkey: only a recovery code (for devices that cannot make a passkey). */
+export async function createCodeAccount(): Promise<Result<AccountInfo & { recovery: string }>> {
+  const r = await api<AccountInfo & { token: string; recovery: string }>('register/code', { pid: guestId() });
+  if (r.ok) setToken(r.token);
+  return r;
+}
+
+/** The address a phone opens (from the QR) to join this account with a link code. */
+export const linkAddress = (code: string): string => `${location.origin}${location.pathname}?link=${encodeURIComponent(code)}`;
 
 export const redeemLinkCode = (code: string) => api<AccountInfo & { token: string }>('link/redeem', { code });
 export const recoverWithCode = (code: string) => api<AccountInfo & { token: string }>('recover', { code });
@@ -112,20 +125,19 @@ export async function signOut(): Promise<void> {
  */
 export async function adoptAccount(pid: string, token: string): Promise<void> {
   setToken(token);
-  localStorage.setItem(GUEST_KEY, pid);
   const base = httpBase();
   if (base) {
     try {
       const r = await fetch(`${base}/save?pid=${encodeURIComponent(pid)}`, { headers: { 'x-nc-token': token } });
       if (r.ok) {
         const j = (await r.json()) as { state?: unknown };
-        if (j.state) localStorage.setItem(CLUB_KEY, JSON.stringify(j.state));
+        if (j.state) return restoreGame(j.state, pid);
       }
     } catch {
       /* the page will try again when it connects */
     }
   }
-  location.reload();
+  restoreGame(undefined, pid);
 }
 
 function friendly(e: unknown): string {

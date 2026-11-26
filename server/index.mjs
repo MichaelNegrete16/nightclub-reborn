@@ -195,7 +195,7 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
       const ip = req.socket.remoteAddress ?? '?';
       const nowA = Date.now();
       const hits = (authHits.get(ip) ?? []).filter((t) => nowA - t < 60_000);
-      if (hits.length >= 30) return void res.writeHead(429, cors).end(JSON.stringify({ error: 'Demasiados intentos: espera un minuto.' }));
+      if (hits.length >= 60) return void res.writeHead(429, cors).end(JSON.stringify({ error: 'Demasiados intentos: espera un minuto.' }));
       hits.push(nowA);
       authHits.set(ip, hits);
       const chunks = [];
@@ -221,9 +221,13 @@ export function createServer({ port = PORT, host = HOST, dataFile = DATA_FILE, a
           if (step === 'register/options') {
             const pid = body.pid;
             if (!validId(pid) || !world.players.has(pid)) r = { status: 403, error: 'Primero entra a la ciudad.' };
-            else r = await auth.registerOptions({ pid, token, name: world.players.get(pid).club.name, origin });
+            else r = await auth.registerOptions({ pid, token, name: world.players.get(pid).club.name, origin, via: body.via });
+          } else if (step === 'register/code') {
+            const pid = body.pid;
+            if (!validId(pid) || !world.players.has(pid)) r = { status: 403, error: 'Primero entra a la ciudad.' };
+            else r = auth.registerCode({ pid, device });
           } else if (step === 'register/verify') r = await auth.registerVerify({ cid: body.cid, response: body.response, origin, label: body.label, device });
-          else if (step === 'login/options') r = await auth.loginOptions({ origin });
+          else if (step === 'login/options') r = await auth.loginOptions({ origin, via: body.via });
           else if (step === 'login/verify') r = await auth.loginVerify({ cid: body.cid, response: body.response, origin, device });
           else if (step === 'link/create') r = auth.linkCreate({ token });
           else if (step === 'link/redeem') r = auth.linkRedeem({ code: body.code, device });

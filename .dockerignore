@@ -1,0 +1,13 @@
+**/node_modules
+web/dist
+web/.vite
+server/data
+server/data.backup-*
+songs
+art
+docs
+.git
+.claude
+*.log
+.env
+.env.*

@@ -170,8 +170,10 @@ export function serverUrl(): string | null {
   }
   const saved = localStorage.getItem('nc.server');
   if (saved) return saved === 'off' ? null : saved;
-  // an https page cannot open an insecure socket: single-player until a secure server is configured
-  if (location.protocol === 'https:') return null;
+  // served over https (the VPS, behind its proxy): the city server is the same address, through a secure socket
+  if (location.protocol === 'https:') return `wss://${location.host}`;
+  // served by the city server itself (http://host:8787): same address; the dev server (5173) talks to 8787 on the same machine
+  if (location.port === '8787') return `ws://${location.host}`;
   return `ws://${location.hostname || 'localhost'}:8787`;
 }
 

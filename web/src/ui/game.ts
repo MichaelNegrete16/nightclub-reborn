@@ -188,8 +188,8 @@ export class GameUi {
     openMissions(this.ctx);
   }
 
-  openAccount(needLogin = false): void {
-    openAccount(this.ctx, needLogin);
+  openAccount(needLogin = false, required = false): void {
+    openAccount(this.ctx, needLogin, required);
   }
 
   openMenu(): void {

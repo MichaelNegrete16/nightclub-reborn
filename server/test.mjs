@@ -282,6 +282,11 @@ await test('saved games: exact copy, cleaned, backed up, and a wipe can never re
   assert.equal(cleaned.items.length, 1);
   assert.ok(cleaned.coins >= 0);
 
+  // an old copy from another device (a bit less experience) does not step on the newer one
+  const stale = await post(pid, { ...game, xp: 50010, coins: 999 });
+  assert.equal(stale.status, 409, 'an older copy is refused');
+  assert.equal((await (await fetch(`${base}/save?pid=${pid}`)).json()).meta.xp, 50050, 'the newer copy stays');
+
   // a wipe does not replace the good game; it is kept apart; an explicit start-over does replace it
   const wipe = await post(pid, { xp: 0, story: { intro: false } });
   assert.equal(wipe.status, 409);
@@ -828,6 +833,10 @@ await test('accounts: a passkey protects a club, other devices join with a code,
   assert.equal(rv.passkeys.length, 1);
   assert.equal((await call('register/verify', { cid: ro.cid, response: {} })).status, 400, 'a challenge works once');
   assert.equal((await call('register/options', { pid: P }, undefined, 'http://evil.example')).status, 400, 'only our own site can ask for passkeys');
+  // on a computer the passkey is asked for on the player's phone (the browser shows its QR)
+  assert.deepEqual((await call('register/options', { pid: P, via: 'phone' }, rv.token)).options.hints, ['hybrid']);
+  assert.deepEqual((await call('login/options', { via: 'phone' })).options.hints, ['hybrid']);
+  assert.equal((await call('login/options', {})).options.hints, undefined, 'no preference unless asked');
   c.ws.close();
 
   // 2. now knowing the id is not enough
@@ -884,6 +893,21 @@ await test('accounts: a passkey protects a club, other devices join with a code,
   assert.equal((await call('recover', { code: rv.recovery })).status, 401, 'a new recovery code replaces the old one');
   assert.equal((await call('recover', { code: fresh.recovery })).pid, P);
   assert.equal((await call('passkey/remove', { id: b64(credId) }, back.token)).status, 400, 'the last passkey cannot be removed');
+
+  // 5b. a device with no passkey protects its club with a recovery code only; a second try on a club with an account is refused
+  const Q = 'player-codeonly-01';
+  const cq = client(s.port, Q, 'SinPasskey');
+  await cq.ready;
+  await cq.waitCity();
+  const rc = await call('register/code', { pid: Q });
+  assert.equal(rc.status, 200, rc.error);
+  assert.match(rc.recovery, /^[A-Z2-9]{5}(-[A-Z2-9]{5}){3}$/);
+  assert.equal(rc.passkeys.length, 0);
+  assert.equal((await call('register/code', { pid: Q })).status, 409, 'only once');
+  assert.equal((await call('register/code', { pid: 'player-nobody-777' })).status, 403);
+  const lk2 = await call('link/create', {}, rc.token);
+  assert.equal((await call('link/redeem', { code: lk2.code })).pid, Q, 'and it can link a phone with a code (or the QR)');
+  cq.ws.close();
 
   // 6. logging out ends that session only
   await call('logout', {}, joined.token);

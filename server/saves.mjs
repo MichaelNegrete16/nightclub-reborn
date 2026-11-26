@@ -5,7 +5,8 @@
 //   - an incoming game is always cleaned with the game's own sanitizeClub (never stored as received);
 //   - the previous copy is kept as a backup (at most one every 30 minutes, the last 8 are kept);
 //   - a game that looks like a wipe (far less progress than the stored one) does NOT replace it unless the player explicitly
-//     started over; it is kept apart as "suspect", so nothing is lost either way.
+//     started over; it is kept apart as "suspect", so nothing is lost either way;
+//   - experience never goes down, so a game with less of it than the stored one is an old copy (another device): refused too.
 
 import { sanitizeClub } from '../web/src/core/club.ts';
 import { levelOf } from '../web/src/core/progression.ts';
@@ -46,11 +47,11 @@ export class SaveStore {
   }
 
   /** Keep the current copy as a backup, if the last backup is old enough. */
-  #backup(id, now) {
+  #backup(id, now, always = false) {
     const cur = this.#db.prepare('SELECT at, meta, state FROM saves WHERE pid = ?').get(id);
     if (!cur) return;
     const last = this.backups(id)[0];
-    if (last && now - last.at < BACKUP_EVERY) return;
+    if (!always && last && now - last.at < BACKUP_EVERY) return;
     this.#db.prepare('INSERT OR REPLACE INTO save_backups (pid, at, body) VALUES (?, ?, ?)').run(id, now, JSON.stringify({ at: cur.at, meta: JSON.parse(cur.meta), state: JSON.parse(cur.state) }));
     this.#db.prepare('DELETE FROM save_backups WHERE pid = ? AND at NOT IN (SELECT at FROM save_backups WHERE pid = ? ORDER BY at DESC LIMIT ?)').run(id, id, KEEP);
   }
@@ -67,11 +68,11 @@ export class SaveStore {
     return row ? JSON.parse(row.body) : null;
   }
 
-  #put(id, now, meta, state) {
-    // the backup and the new copy go in together: either both happen or none
+  #put(id, now, meta, state, alwaysBackup = false) {
+    // the backup and the new copy go in together: either both happen or none (a forced replace always keeps the old one)
     this.#db.exec('BEGIN');
     try {
-      this.#backup(id, now);
+      this.#backup(id, now, alwaysBackup);
       this.#db.prepare('INSERT INTO saves (pid, at, meta, state) VALUES (?, ?, ?, ?) ON CONFLICT(pid) DO UPDATE SET at = excluded.at, meta = excluded.meta, state = excluded.state').run(id, now, JSON.stringify(meta), JSON.stringify(state));
       this.#db.exec('COMMIT');
     } catch (e) {
@@ -111,7 +112,13 @@ export class SaveStore {
       this.#db.prepare('INSERT OR REPLACE INTO save_suspects (pid, body) VALUES (?, ?)').run(id, JSON.stringify({ at: now, meta, state }));
       return { error: 'Esta partida tiene mucho menos progreso que la guardada: no la reemplacé (se guardó aparte).', status: 409, meta: prev.meta };
     }
-    this.#put(id, now, meta, state);
+    if (prev && !force && meta.xp < prev.meta.xp) {
+      // experience never goes down in the game: less than what is stored means an old copy (another device or tab that was
+      // left open) and it must not step on the newer one. It is kept apart too.
+      this.#db.prepare('INSERT OR REPLACE INTO save_suspects (pid, body) VALUES (?, ?)').run(id, JSON.stringify({ at: now, meta, state }));
+      return { error: 'Tu club se jugó en otro dispositivo y allá va más avanzado: no reemplacé esa partida con esta.', status: 409, meta: prev.meta, stale: true };
+    }
+    this.#put(id, now, meta, state, force);
     return { ok: true, meta, at: now, flags: checked.flags };
   }
 }

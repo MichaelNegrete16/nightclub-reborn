@@ -6,6 +6,7 @@ import { openNews } from './news';
 import { openAccount } from './account';
 import { getPreference, setPreference, type Preference } from '../render/quality';
 import { describe as describeSave } from '../net/cloud';
+import { restoreGame } from '../net/restore';
 import type { Ctx } from './shop';
 
 export interface MenuDeps {
@@ -116,9 +117,7 @@ export function openMenu(deps: MenuDeps): void {
         const game = await cloud.fetchGame(c);
         if (!game) return void (status.textContent = 'No hay ninguna partida guardada con ese código.');
         if (!(await confirmDialog(`Esto reemplaza tu partida de este navegador por la guardada (${describeSave(game.meta)}). Tu partida actual se perdería. ¿Seguimos?`, 'Sí, recuperar'))) return;
-        localStorage.setItem('nc.club.v1', JSON.stringify(game.state));
-        localStorage.setItem('nc.guest.v1', c); // from now on this browser IS that player
-        location.reload();
+        restoreGame(game.state, c); // from now on this browser IS that player
       }),
     );
   }

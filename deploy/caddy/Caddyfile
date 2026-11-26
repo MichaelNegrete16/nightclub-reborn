@@ -1,0 +1,14 @@
+# The game's public door: https on port 8443, everything (pages, songs, the city's websocket) passed to the game container.
+{
+	admin off
+	email {$ACME_EMAIL:admin@nightclubreborn.duckdns.org}
+}
+
+{$NC_DOMAIN:nightclubreborn.duckdns.org}:8443 {
+	tls {
+		dns duckdns {env.DUCKDNS_TOKEN}
+		propagation_delay 30s
+	}
+	encode zstd gzip
+	reverse_proxy game:8787
+}

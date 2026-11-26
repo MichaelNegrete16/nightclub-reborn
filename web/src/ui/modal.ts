@@ -22,7 +22,8 @@ export function closeModals(): void {
   for (const m of [...stack]) m.close();
 }
 
-export function openModal(title: string, className = '', onClose?: () => void): ModalHandle {
+/** `locked`: the window can only be closed by the code (no X, no Escape, no click outside) — for steps that are required. */
+export function openModal(title: string, className = '', onClose?: () => void, locked = false): ModalHandle {
   const host = document.getElementById('modal-root')!;
   const backdrop = el('div', 'backdrop');
   const box = el('div', `modal ${className}`);
@@ -31,7 +32,7 @@ export function openModal(title: string, className = '', onClose?: () => void): 
   const x = button('', 'icon-btn', () => handle.close());
   x.innerHTML = icon('close');
   x.setAttribute('aria-label', 'Cerrar');
-  head.append(el('h2', '', title), headExtra, x);
+  head.append(el('h2', '', title), headExtra, ...(locked ? [] : [x]));
   const body = el('div', 'modal-body');
   box.append(head, body);
   backdrop.append(box);
@@ -39,7 +40,7 @@ export function openModal(title: string, className = '', onClose?: () => void): 
 
   let closed = false;
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && stack[stack.length - 1] === handle) handle.close();
+    if (!locked && e.key === 'Escape' && stack[stack.length - 1] === handle) handle.close();
   };
   const handle: ModalHandle = {
     body,
@@ -54,7 +55,7 @@ export function openModal(title: string, className = '', onClose?: () => void): 
     },
   };
   backdrop.addEventListener('pointerdown', (e) => {
-    if (e.target === backdrop) handle.close();
+    if (!locked && e.target === backdrop) handle.close();
   });
   window.addEventListener('keydown', onKey);
   stack.push(handle);

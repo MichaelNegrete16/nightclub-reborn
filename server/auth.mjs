@@ -97,7 +97,8 @@ export function createAuth({ db, origins }) {
     allowed,
 
     /** Start creating a passkey for a club: a guest claims theirs, or an account adds another device (needs a session). */
-    async registerOptions({ pid, token, name, origin }, now = Date.now()) {
+    /** `via`: 'phone' asks the browser to keep the passkey on the player's phone (it shows its own QR); 'here' keeps it on this device. */
+    async registerOptions({ pid, token, name, origin, via }, now = Date.now()) {
       const o = okOrigin(origin);
       if (!o) return { status: 400, error: 'Este sitio no está autorizado para passkeys.' };
       if (hasAccount(pid) && pidOf(token, now) !== pid) return { status: 401, error: 'Entra primero con tu cuenta.' };
@@ -109,6 +110,7 @@ export function createAuth({ db, origins }) {
         userID: new TextEncoder().encode(pid),
         attestationType: 'none',
         authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+        ...(via === 'phone' ? { preferredAuthenticatorType: 'remoteDevice' } : via === 'here' ? { preferredAuthenticatorType: 'localDevice' } : {}),
         excludeCredentials: existing.map((c) => ({ id: c.id })),
       });
       return { options, cid: putChallenge(options.challenge, pid, 'register', now) };
@@ -143,11 +145,24 @@ export function createAuth({ db, origins }) {
       return { pid: ch.pid, token: newSession(ch.pid, device, now), recovery, ...view(ch.pid) };
     },
 
+    /**
+     * Protect a guest club without a passkey (a device that cannot make one): the account is created with only a recovery code,
+     * and this device gets a session. Other devices join later with a link code (or the QR) from this one.
+     */
+    registerCode({ pid, device }, now = Date.now()) {
+      if (hasAccount(pid)) return { status: 409, error: 'Este club ya tiene cuenta: entra con tu passkey o un código.' };
+      const recovery = recoveryCode();
+      q.addAccount.run(pid, now, sha(cleanCode(recovery)));
+      return { pid, token: newSession(pid, device, now), recovery, ...view(pid) };
+    },
+
     /** Start signing in: no id needed, the device offers the passkeys it has for this site. */
-    async loginOptions({ origin }, now = Date.now()) {
+    async loginOptions({ origin, via }, now = Date.now()) {
       const o = okOrigin(origin);
       if (!o) return { status: 400, error: 'Este sitio no está autorizado para passkeys.' };
       const options = await generateAuthenticationOptions({ rpID: o.rpID, userVerification: 'preferred' });
+      // the passkey is on the phone: tell the browser to go straight to "use a phone" (its own QR)
+      if (via === 'phone') options.hints = ['hybrid'];
       return { options, cid: putChallenge(options.challenge, null, 'login', now) };
     },
 

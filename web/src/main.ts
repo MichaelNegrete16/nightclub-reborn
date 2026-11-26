@@ -12,7 +12,8 @@ import { CATALOG } from './core/catalog';
 import { simulatedNeighbors } from './core/world';
 import { Cloud, looksFresh, describe as describeSave } from './net/cloud';
 import { Online, guestId, httpBase, neighborsFrom, serverUrl } from './net/client';
-import { authHeaders } from './net/session';
+import { adoptAccount, authHeaders, getToken, redeemLinkCode } from './net/session';
+import { isRestoring, restoreGame } from './net/restore';
 import { Avatar } from './render/avatar';
 import { ClubView, type ClubHooks } from './render/club';
 import { ComicStudio } from './render/comic';
@@ -54,6 +55,16 @@ function loadClub() {
 }
 
 async function main() {
+  // a phone that scanned the QR of another device: join that account (its club and progress come with it), then start over clean
+  const linkCode = new URLSearchParams(location.search).get('link');
+  if (linkCode) {
+    const r = await redeemLinkCode(linkCode);
+    if (r.ok) return void (await adoptAccount(r.pid, r.token));
+    window.alert(`No se pudo entrar con ese código QR: ${r.error} Genera uno nuevo en el otro dispositivo (vale 5 minutos).`);
+    const clean = new URL(location.href);
+    clean.searchParams.delete('link');
+    history.replaceState(null, '', clean.toString());
+  }
   const stageEl = document.getElementById('stage') as HTMLElement;
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   const loading = document.getElementById('loading') as HTMLElement;
@@ -134,7 +145,10 @@ async function main() {
   };
   const save = () => {
     window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(() => localStorage.setItem(CLUB_KEY, JSON.stringify(club.state)), 300);
+    if (isRestoring()) return; // a saved game is being put in its place: do not write the old one over it
+    saveTimer = window.setTimeout(() => {
+      if (!isRestoring()) localStorage.setItem(CLUB_KEY, JSON.stringify(club.state));
+    }, 300);
   };
   const club = new ClubView(canvas, {
     onChange: () => { save(); uiHooks?.onChange(); },
@@ -237,7 +251,19 @@ async function main() {
       onScout: (fn) => (heistListeners.scout = fn),
       onHeist: (fn) => (heistListeners.heist = fn),
     };
-    net.onAuth = () => ui.openAccount(true);
+    net.onAuth = () => {
+      authAsked = true; // this club already has an account: the sign-in window is the one to show
+      ui.openAccount(true);
+    };
+    // every club must have its account (so it can be played anywhere, and nobody else can take it): ask once the story has
+    // started, and keep asking until it is done
+    let authAsked = false;
+    const requireAccount = () => {
+      if (authAsked || getToken() || !club.state.story.intro || document.body.classList.contains('in-scene') || document.body.classList.contains('onboarding')) return;
+      authAsked = true;
+      ui.openAccount(false, true);
+    };
+    window.setInterval(requireAccount, 15_000);
     net.onElsewhere = () => uiHooks?.onToast('Abriste el juego en otro dispositivo: esta ventana se pausó. Recarga para volver aquí.', 'bad');
     club.launder = (uid) => net.launder(uid);
     club.bankOp = (op, amount) => net.bank(op, amount);
@@ -285,19 +311,34 @@ async function main() {
       if (!window.confirm(`Encontré una partida tuya guardada en la nube (${describeSave(found.meta)}). ¿La recupero?`)) return;
       const game = await cloud.fetchGame();
       if (!game) return;
-      localStorage.setItem(CLUB_KEY, JSON.stringify(game.state));
-      location.reload();
+      restoreGame(game.state);
+    };
+    // this browser has a much smaller game than the one the city keeps for this player (a restore that did not stick, an old copy):
+    // the server refuses to replace the good one, so offer to bring it here instead
+    let conflictAsked = false;
+    const offerNewer = async () => {
+      const theirs = cloud.conflict;
+      if (!theirs || conflictAsked || isRestoring()) return;
+      conflictAsked = true;
+      if (!window.confirm(`Tu club se jugó en otro dispositivo y allá va más avanzado (${describeSave(theirs)}). Este navegador tiene una copia vieja. ¿Cargo el club más nuevo aquí? (Recomendado)`)) {
+        if (window.confirm('¿Seguro? Entonces este navegador reemplaza al club del otro dispositivo y se pierde lo que hiciste allá. ¿Reemplazar?')) cloud.forceNext = true;
+        else window.setTimeout(() => (conflictAsked = false), 5 * 60_000); // keep it from saving and ask again later
+        return;
+      }
+      const game = await cloud.fetchGame();
+      if (game) restoreGame(game.state);
     };
     net.onStatus = ((prev) => (s) => {
       prev(s);
       if (s === 'online') void offerRestore();
+      if (s === 'online') requireAccount();
     })(net.onStatus);
     window.setInterval(() => {
       if (club.resetAt > lastReset) {
         lastReset = club.resetAt;
         cloud.forceNext = true; // started over on purpose
       }
-      if (net.status === 'online' && !looksFresh(club.state)) void cloud.sync();
+      if (net.status === 'online' && !looksFresh(club.state)) void cloud.sync().then(() => offerNewer());
       else if (net.status === 'online' && cloud.forceNext) void cloud.sync();
     }, 30_000);
     let lastReset = club.resetAt;

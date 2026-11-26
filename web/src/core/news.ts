@@ -24,6 +24,18 @@ export interface News {
 
 export const NEWS: News[] = [
   {
+    id: '2026-11-26a',
+    date: '26 de noviembre de 2026',
+    title: 'Tu club en cualquier dispositivo con un QR',
+    intro: 'Cada club tiene ahora su cuenta: juega en el computador o en el celular con el mismo progreso.',
+    entries: [
+      { kind: 'icon', ref: 'lock', title: 'Asegura tu club (obligatorio)', text: 'Al entrar te pedimos proteger tu club: con una passkey (tu huella o tu cara) o, si tu dispositivo no la tiene, solo con un código de recuperación. Guarda ese código: es tu salvavidas.', where: 'Al entrar al juego · Menú › Cuenta' },
+      { kind: 'icon', ref: 'star', title: 'Tu celular es la llave', text: 'En el computador, «Crear passkey con mi celular»: el navegador muestra un QR, lo escaneas con el celular y confirmas con tu huella o cara. Desde ahí entras a tu club en cualquier computador con «Entrar con mi celular» (Bluetooth encendido en los dos). No hace falta que el computador tenga huella.', where: 'Al asegurar tu club · Menú › Cuenta' },
+      { kind: 'icon', ref: 'move', title: 'Llévalo al celular con un QR', text: 'En el computador abre Menú › Cuenta › Mi cuenta › Mostrar QR para el celular y escanéalo con la cámara del teléfono: se abre el juego con tu club y todo tu progreso. El QR vale 5 minutos y sirve una vez.', where: 'Menú › Cuenta › Vincular otro dispositivo' },
+      { kind: 'icon', ref: 'check', title: 'Recuperar ya no se pisa', text: 'Al recuperar tu club en otro computador, a veces volvía el club vacío. Ya no: y si la ciudad tiene tu club más avanzado que el del navegador, el juego te ofrece cargarlo.', where: 'Menú › Partida en la nube' },
+    ],
+  },
+  {
     id: '2026-11-25t',
     date: '25 de noviembre de 2026',
     title: 'Mover por bloques y sofás donde sí se sienta la gente',

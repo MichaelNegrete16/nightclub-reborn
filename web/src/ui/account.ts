@@ -1,6 +1,7 @@
 import { button, el } from './dom';
 import { openModal } from './modal';
-import { adoptAccount, createPasskey, getToken, makeLinkCode, myAccount, newRecoveryCode, passkeysAvailable, recoverWithCode, redeemLinkCode, removePasskey, signInWithPasskey, signOut, type AccountInfo } from '../net/session';
+import QRCode from 'qrcode';
+import { adoptAccount, createCodeAccount, createPasskey, getToken, linkAddress, onPhone, type PasskeyPlace, makeLinkCode, myAccount, newRecoveryCode, passkeysAvailable, recoverWithCode, redeemLinkCode, removePasskey, signInWithPasskey, signOut, type AccountInfo } from '../net/session';
 import type { Ctx } from './shop';
 
 /**
@@ -13,8 +14,9 @@ const btn = (label: string, cls: string, fn: (b: HTMLButtonElement) => void): HT
   return b;
 };
 
-export function openAccount(ctx: Ctx, needLogin = false): void {
-  const modal = openModal(needLogin ? 'Tu club está protegido' : 'Mi cuenta', 'account');
+export function openAccount(ctx: Ctx, needLogin = false, required = false): void {
+  // `required`: every player must protect their club once; the window stays until they do
+  const modal = openModal(needLogin ? 'Tu club está protegido' : required ? 'Asegura tu club' : 'Mi cuenta', 'account', undefined, required || needLogin);
   const body = modal.body;
   const msg = el('p', 'acc-msg');
   const say = (text: string, bad = false) => {
@@ -40,15 +42,16 @@ export function openAccount(ctx: Ctx, needLogin = false): void {
   const signInSection = (): HTMLElement => {
     const parts: HTMLElement[] = [];
     if (passkeysAvailable()) {
-      parts.push(
-        btn('Entrar con passkey', 'btn primary', (b) => void busy(b, async () => {
-          say('Esperando tu huella, cara o PIN…');
-          const r = await signInWithPasskey();
+      const enter = (via: PasskeyPlace, label: string, cls: string) =>
+        btn(label, cls, (b) => void busy(b, async () => {
+          say(via === 'phone' && !onPhone() ? 'Escanea con tu celular el QR que muestra el navegador y confirma con tu huella o cara…' : 'Esperando tu huella, cara o PIN…');
+          const r = await signInWithPasskey(via);
           if (!r.ok) return say(r.error, true);
           say('¡Listo! Cargando tu club…');
           await adoptAccount(r.pid, r.token);
-        })),
-      );
+        }));
+      if (onPhone()) parts.push(enter('here', 'Entrar con mi passkey', 'btn primary'));
+      else parts.push(enter('phone', 'Entrar con mi celular', 'btn primary'), enter('here', 'Entrar con este computador', 'btn'));
     } else {
       parts.push(el('p', 'sub', 'Las passkeys solo funcionan en una página segura (https o localhost). Aquí puedes entrar con un código.'));
     }
@@ -88,7 +91,7 @@ export function openAccount(ctx: Ctx, needLogin = false): void {
       big,
       btn('Copiar', 'btn', () => void navigator.clipboard?.writeText(code).then(() => say('Copiado.'), () => say('Cópialo a mano.', true))),
       msg,
-      btn('Ya lo guardé', 'btn primary', () => draw()),
+      btn('Ya lo guardé', 'btn primary', () => (required ? modal.close() : void draw())),
     );
   };
 
@@ -114,20 +117,29 @@ export function openAccount(ctx: Ctx, needLogin = false): void {
         list.append(row);
       }
       const linkOut = el('p', 'acc-link');
+      const qr = el('img', 'acc-qr') as HTMLImageElement;
+      qr.alt = 'Código QR para entrar desde otro dispositivo';
+      qr.hidden = true;
       body.append(
         box('Cuenta protegida ✓', 'Tu club solo se abre con tus passkeys. Tu progreso está en la ciudad y lo ves igual desde el computador y el celular.'),
-        box('Tus passkeys', list, ...(passkeysAvailable() ? [btn('Agregar una passkey en este dispositivo', 'btn', (b) => void busy(b, async () => {
-          say('Esperando tu huella, cara o PIN…');
+        box('Tus passkeys', list, ...(passkeysAvailable() ? [btn(onPhone() ? 'Agregar una passkey en este celular' : 'Agregar una passkey en mi celular', 'btn', (b) => void busy(b, async () => {
+          say(onPhone() ? 'Esperando tu huella, cara o PIN…' : 'Escanea con tu celular el QR que muestra el navegador…');
           const r = await createPasskey();
           say(r.ok ? 'Passkey agregada.' : r.error, !r.ok);
           if (r.ok) void draw();
         }))] : [])),
-        box('Vincular otro dispositivo', 'Genera un código y escríbelo en el otro dispositivo (Menú › Cuenta › Ya tengo cuenta). Vale 5 minutos y se usa una sola vez.', btn('Generar código', 'btn', (b) => void busy(b, async () => {
+        box('Vincular otro dispositivo', 'Escanea el código QR con la cámara del celular y entrarás con tu club y todo tu progreso. Si no puedes escanear, escribe los 8 números en el otro dispositivo (Menú › Cuenta › Ya tengo cuenta). Vale 5 minutos y se usa una sola vez.', btn(onPhone() ? 'Mostrar código para el computador' : 'Mostrar QR para el celular', 'btn primary', (b) => void busy(b, async () => {
           const r = await makeLinkCode();
           if (!r.ok) return say(r.error, true);
           linkOut.textContent = `${r.code.slice(0, 4)} ${r.code.slice(4)}`;
+          try {
+            qr.src = await QRCode.toDataURL(linkAddress(r.code), { width: 240, margin: 1, color: { dark: '#150d26', light: '#ffffff' } });
+            qr.hidden = false;
+          } catch {
+            qr.hidden = true; // the numbers still work
+          }
           say('Vale 5 minutos.');
-        })), linkOut),
+        })), qr, linkOut),
         box('Código de recuperación', 'Si pierdes todos tus dispositivos es la única forma de volver. Generar uno nuevo anula el anterior.', btn('Generar uno nuevo', 'btn', (b) => void busy(b, async () => {
           const r = await newRecoveryCode();
           if (!r.ok) return say(r.error, true);
@@ -143,17 +155,30 @@ export function openAccount(ctx: Ctx, needLogin = false): void {
     }
     // a guest: nothing protects this club yet
     body.append(
-      box('Protege tu club', 'Ahora mismo tu club está guardado solo en este navegador. Crea una passkey (tu huella, tu cara o el PIN del dispositivo) y podrás entrar desde el celular o el computador con tu progreso, sin contraseñas.',
+      box('Protege tu club', onPhone()
+        ? `${required ? 'Para seguir jugando, cada club necesita su cuenta. ' : ''}Crea tu passkey con la huella o la cara de este celular: es la llave de tu club en cualquier dispositivo, sin contraseñas.`
+        : `${required ? 'Para seguir jugando, cada club necesita su cuenta. ' : ''}Tu celular será la llave de tu club: el navegador te mostrará un código QR, lo escaneas con la cámara del celular y confirmas con tu huella o tu cara. Necesitas el Bluetooth encendido en el computador y en el celular. Después entras desde cualquier computador con tu celular, sin contraseñas.`,
         ...(passkeysAvailable()
-          ? [btn('Crear mi passkey', 'btn primary', (b) => void busy(b, async () => {
-            say('Esperando tu huella, cara o PIN…');
-            const r = await createPasskey();
-            if (!r.ok) return say(r.error, true);
-            ctx.toast('¡Cuenta protegida!', 'ok');
-            if (r.recovery) showRecovery(r.recovery);
-            else void draw();
-          }))]
-          : [el('p', 'acc-msg bad', 'Este dispositivo no permite passkeys en esta dirección (hace falta https o localhost).')])),
+          ? [
+            ...(['phone', 'here'] as PasskeyPlace[]).filter((v) => !onPhone() || v === 'here').map((via, i) =>
+              btn(onPhone() ? 'Crear mi passkey' : via === 'phone' ? 'Crear passkey con mi celular' : 'Usar este computador (huella o PIN)', i === 0 ? 'btn primary' : 'btn', (b) => void busy(b, async () => {
+                say(via === 'phone' && !onPhone() ? 'Escanea con tu celular el QR que muestra el navegador y confirma con tu huella o cara…' : 'Esperando tu huella, cara o PIN…');
+                const r = await createPasskey(via);
+                if (!r.ok) return say(r.error, true);
+                ctx.toast('¡Cuenta protegida!', 'ok');
+                if (r.recovery) showRecovery(r.recovery);
+                else void draw();
+              }))),
+            ...(onPhone() ? [] : [el('p', 'sub', '¿Tu computador no tiene Bluetooth? Abre el juego en tu celular, crea ahí tu passkey y luego, en el celular, Menú › Cuenta › Mostrar QR: en el computador escribes los 8 números en «Ya tengo cuenta».')]),
+          ]
+          : [el('p', 'acc-msg bad', 'Este dispositivo no permite passkeys en esta dirección: usa la opción con código.')]),
+        btn('Sin passkey: solo con código de recuperación', 'btn', (b) => void busy(b, async () => {
+          const r = await createCodeAccount();
+          if (!r.ok) return say(r.error, true);
+          ctx.toast('¡Cuenta protegida!', 'ok');
+          showRecovery(r.recovery);
+        })),
+      ),
       signInSection(),
       msg,
     );

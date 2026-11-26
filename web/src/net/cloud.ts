@@ -32,6 +32,8 @@ export class Cloud {
   private last = '';
   private busy = false;
   private id: string;
+  /** the city keeps a much bigger game for this player than this browser has (the server refused the smaller one) */
+  conflict: CloudMeta | null = null;
   /** the player started over on purpose: the next upload may replace a bigger game */
   forceNext = false;
 
@@ -60,11 +62,15 @@ export class Cloud {
         this.forceNext = false;
         this.problem = '';
         this.info = { at: j.at ?? Date.now(), meta: j.meta };
+        this.conflict = null;
         return true;
       }
       if (r.status === 429) return false; // too soon: try again at the next tick
       this.problem = j.error ?? 'No se pudo guardar en la nube.';
-      if (r.status === 409 && j.meta) this.info = { at: this.info?.at ?? 0, meta: j.meta };
+      if (r.status === 409 && j.meta) {
+        this.info = { at: this.info?.at ?? 0, meta: j.meta };
+        this.conflict = j.meta;
+      }
     } catch {
       this.problem = 'Sin conexión con el servidor: se guardará cuando vuelva.';
     } finally {

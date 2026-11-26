@@ -1,0 +1,46 @@
+# Nightclub Reborn on the VPS. Run from this folder: docker compose up -d --build
+# Only the game's own container, its own network and its own folders: nothing else on the machine is touched.
+name: nightclub
+services:
+  game:
+    build: ..
+    image: nightclub-reborn:latest
+    container_name: nightclub_game
+    restart: unless-stopped
+    # only on the machine itself: the public way in (a tunnel or a proxy) is set up separately
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      # where passkeys may be used from: put the game's https address here once it has a domain
+      AUTH_ORIGINS: ${AUTH_ORIGINS:-https://nightclubreborn.duckdns.org,https://nightclubreborn.duckdns.org:8443,http://localhost:8787}
+    volumes:
+      - ${NC_DATA:-/home/ubuntu/nightclub-data}/data:/data
+      - ${NC_DATA:-/home/ubuntu/nightclub-data}/songs:/songs:ro
+    # also on the network of the machine's shared nginx (sara_nginx), which serves the clean address on port 443
+    networks: [nightclub_net, edge]
+    mem_limit: 1g
+  # the https door (port 8443). The DuckDNS token is read from duckdns.env in the data folder: it never goes into the repo.
+  proxy:
+    build: ./caddy
+    image: nightclub-caddy:latest
+    container_name: nightclub_proxy
+    restart: unless-stopped
+    depends_on: [game]
+    ports:
+      - "8443:8443"
+    env_file:
+      - ${NC_DATA:-/home/ubuntu/nightclub-data}/duckdns.env
+    environment:
+      NC_DOMAIN: nightclubreborn.duckdns.org
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${NC_DATA:-/home/ubuntu/nightclub-data}/caddy:/data
+    networks: [nightclub_net]
+    mem_limit: 256m
+    profiles: [https]
+networks:
+  nightclub_net:
+    name: nightclub_net
+  edge:
+    name: sara_sara_net
+    external: true
